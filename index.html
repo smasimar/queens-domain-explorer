@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Queen's Domain Explorer</title>
+    <script type="module" crossorigin src="./assets/index-CIMgnU8L.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BFWieitd.css">
+  </head>
+  <body>
+    <section id="landing">
+      <h1>Queen's Domain Explorer</h1>
+      <p>Free-fly the world of <em>Queen's Domain</em> in 3D, using your own copy of the game.
+        All parsing happens in this browser tab. Nothing is uploaded.</p>
+      <label class="pick">
+        Select <code>QueensDomain-WindowsNoEditor.pak</code>
+        <input id="pak" type="file" accept=".pak" />
+      </label>
+      <p class="hint">Usually in<br /><code>…\steamapps\common\QueensDomain\QueensDomain\Content\Paks\</code></p>
+      <div class="row">
+        <button id="open-cache" hidden>Open from local cache</button>
+        <button id="clear-cache" class="secondary">Clear cache</button>
+      </div>
+      <p id="status"></p>
+    </section>
+    <div id="hud" hidden>
+      <div id="help">Click to fly · WASD move · Space/E up · C/Q down · Shift boost · Wheel speed · T tint · L markers · M menu · Esc release</div>
+      <div id="crosshair"></div>
+      <div id="zone"></div>
+      <div id="info"></div>
+      <div id="progress"></div>
+    </div>
+    <nav id="menu" hidden></nav>
+  </body>
+</html>
