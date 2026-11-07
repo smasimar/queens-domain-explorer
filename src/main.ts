@@ -21,6 +21,8 @@ import { createWorkerApi } from "./viewer/rpc.ts";
 import { applyGameTheme } from "./viewer/theme.ts";
 import { World } from "./viewer/world.ts";
 import { ALL_LEVELS, areaLabel, PHASE1_LEVELS } from "./viewer/zones.ts";
+import "@fontsource/arvo/400.css";
+import "@fontsource/arvo/400-italic.css";
 import "./style.css";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -48,6 +50,13 @@ async function init() {
     cacheBtn.hidden = false;
     cacheBtn.onclick = () => run(async () => api.openCache(ns));
   }
+  // The file row is a <label>; make Enter/Space open the picker too.
+  document.querySelector<HTMLLabelElement>('label[for="pak"]')!.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      $<HTMLInputElement>("pak").click();
+    }
+  });
   $<HTMLInputElement>("pak").onchange = (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (file) run(async () => void (await api.open(file)));

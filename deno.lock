@@ -1,6 +1,7 @@
 {
   "version": "5",
   "specifiers": {
+    "npm:@fontsource/arvo@^5.3.0": "5.3.0",
     "npm:@types/three@0.170": "0.170.0",
     "npm:three@0.170": "0.170.0",
     "npm:typescript@^5.6.3": "5.9.3",
@@ -121,6 +122,9 @@
       "integrity": "sha512-tQd/1efJuzPC6rCFwEvLtci/xNFcTZknmXs98FYDfGE4wP9ClFV98nyKrzJKVPMhdDnjzLhdUyMX4PsQAPjwIw==",
       "os": ["win32"],
       "cpu": ["x64"]
+    },
+    "@fontsource/arvo@5.3.0": {
+      "integrity": "sha512-BV8Exol50MVqbu3CfLYt7YKP150FnXb5lRpVxQ0es33nUdZ3Ma0wO2F1klXv5ROY9p4vZGH27O4lnD0fYLjdww=="
     },
     "@rollup/rollup-android-arm-eabi@4.68.0": {
       "integrity": "sha512-Ta2n0ntLfzP0LqwwcXOIh2z0mnHjlxMS+h4Y9lo+w33Quyf9KFKEi9QZ2IKqeEBKr0qxNpXc/DQjz5KVIs8AEA==",
@@ -396,6 +400,7 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
+        "npm:@fontsource/arvo@^5.3.0",
         "npm:@types/three@0.170",
         "npm:three@0.170",
         "npm:typescript@^5.6.3",
