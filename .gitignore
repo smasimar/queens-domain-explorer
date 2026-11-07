@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.vite/
+# Game data must never be committed
+*.pak
+*.uasset
+*.uexp
+*.ubulk
+*.umap
+*.ufont
+export/
+data/
+
+# Local dev config (contains machine paths)
+.claude/
