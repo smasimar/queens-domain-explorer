@@ -4,24 +4,39 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Queen's Domain Explorer</title>
-    <script type="module" crossorigin src="./assets/index-CIMgnU8L.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BFWieitd.css">
+    <script type="module" crossorigin src="./assets/index-Df2vp3K2.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-Cgn7unG1.css">
   </head>
   <body>
     <section id="landing">
-      <h1>Queen's Domain Explorer</h1>
-      <p>Free-fly the world of <em>Queen's Domain</em> in 3D, using your own copy of the game.
-        All parsing happens in this browser tab. Nothing is uploaded.</p>
-      <label class="pick">
-        Select <code>QueensDomain-WindowsNoEditor.pak</code>
-        <input id="pak" type="file" accept=".pak" />
-      </label>
-      <p class="hint">Usually in<br /><code>…\steamapps\common\QueensDomain\QueensDomain\Content\Paks\</code></p>
-      <div class="row">
-        <button id="open-cache" hidden>Open from local cache</button>
-        <button id="clear-cache" class="secondary">Clear cache</button>
+      <div class="lp-frame">
+        <h1 class="lp-title">Queen's Domain Explorer</h1>
+        <div class="lp-body">
+          <div class="lp-panel lp-list" role="menu">
+            <label class="lp-row" for="pak" tabindex="0" role="menuitem">
+              <i class="lp-diamond"></i><span>Select game data</span><em>.pak</em>
+            </label>
+            <input id="pak" type="file" accept=".pak" hidden />
+            <button id="open-cache" class="lp-row" role="menuitem" hidden>
+              <i class="lp-diamond"></i><span>Open from local cache</span>
+            </button>
+            <button id="clear-cache" class="lp-row" role="menuitem">
+              <i class="lp-dot"></i><span>Clear cache</span>
+            </button>
+          </div>
+          <div class="lp-panel lp-desc">
+            <p>Free-fly the world of <em>Queen's Domain</em> in 3D, using your own copy of the game.</p>
+            <p>Select <code>QueensDomain-WindowsNoEditor.pak</code>. It is usually in</p>
+            <p class="lp-path"><code>…\steamapps\common\QueensDomain\<wbr />QueensDomain\Content\Paks\</code></p>
+            <p class="lp-note">All parsing happens in this browser tab. Nothing is uploaded.</p>
+            <p id="status"></p>
+          </div>
+        </div>
+        <footer class="lp-hints">
+          <span class="lp-coin"></span>
+          <span class="lp-keys"><b>Tab</b> Select <b>Enter</b> Confirm</span>
+        </footer>
       </div>
-      <p id="status"></p>
     </section>
     <div id="hud" hidden>
       <div id="help">Click to fly · WASD move · Space/E up · C/Q down · Shift boost · Wheel speed · T tint · L markers · M menu · Esc release</div>
