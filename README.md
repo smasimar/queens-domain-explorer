@@ -33,10 +33,13 @@ stagger, weapon XP and special charges work.
 | Mouse wheel | Change speed |
 | T | Toggle zone tint |
 | L | Toggle Wing Altar and Crystal Monument markers |
+| F | Search items and places |
 | M | Show / hide the menu |
 | Esc | Release the mouse |
 
-The menu (left) has two tabs:
+The menu (left) has a search box and two tabs. Type an item, enemy, note, Wing
+Altar, Crystal Monument or area name; click a result (or press Enter for the first
+one) to fly to it. With a save, each result shows whether you have it.
 
 - **Wing Altars** lists every Wing Altar and Crystal Monument, grouped by area.
   Click an entry to fly there.

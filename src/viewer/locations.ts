@@ -88,6 +88,16 @@ export function updateMarkers(
   }
 }
 
+/** Move the camera a few metres from a spot, keeping the side it comes from, and look straight at it. */
+export function flyToSpot(spot: Vector3, camera: PerspectiveCamera, controls: NoclipControls): void {
+  const back = camera.position.clone().sub(spot).setY(0);
+  if (back.lengthSq() < 1e-6) back.set(1, 0, 0);
+  const eye = spot.clone().addScaledVector(back.normalize(), 5).add(new Vector3(0, 2.5, 0));
+  camera.position.copy(eye);
+  const d = spot.clone().sub(eye).normalize();
+  controls.setYawPitch(Math.atan2(-d.x, -d.z), Math.asin(Math.max(-1, Math.min(1, d.y))));
+}
+
 /** Move the camera to view a Wing Altar / Crystal Monument from in front of it. */
 export function flyTo(p: LocationPoint, camera: PerspectiveCamera, controls: NoclipControls): void {
   const pos = new Vector3(...p.position);

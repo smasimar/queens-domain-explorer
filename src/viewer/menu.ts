@@ -5,7 +5,15 @@ import { CATEGORIES, RANGE, type Settings } from "./settings.ts";
 export type Tab = "travel" | "markers";
 
 /** Left menu with two tabs. Returns the tab bodies. */
-export function createMenu(el: HTMLElement): { travel: HTMLElement; markers: HTMLElement; show: (t: Tab) => void } {
+export function createMenu(el: HTMLElement): {
+  travel: HTMLElement;
+  markers: HTMLElement;
+  searchBox: HTMLElement;
+  results: HTMLElement;
+  show: (t: Tab) => void;
+  /** While searching, the results replace the tab bodies. */
+  searching: (on: boolean) => void;
+} {
   el.innerHTML = `
     <div class="menu-head">
       <div class="menu-tabs" role="tablist">
@@ -14,11 +22,20 @@ export function createMenu(el: HTMLElement): { travel: HTMLElement; markers: HTM
       </div>
       <kbd>M</kbd>
     </div>
+    <div class="menu-search"></div>
     <div class="menu-list" data-body="travel"></div>
-    <div class="menu-list markers" data-body="markers" hidden></div>`;
+    <div class="menu-list markers" data-body="markers" hidden></div>
+    <div class="menu-list results" data-results hidden></div>`;
+  let current: Tab = "travel";
+  let inSearch = false;
+  const layout = () => {
+    for (const b of el.querySelectorAll<HTMLElement>("[data-body]")) b.hidden = inSearch || b.dataset.body !== current;
+    el.querySelector<HTMLElement>("[data-results]")!.hidden = !inSearch;
+  };
   const show = (t: Tab) => {
+    current = t;
     for (const b of el.querySelectorAll<HTMLElement>(".menu-tab")) b.classList.toggle("active", b.dataset.tab === t);
-    for (const b of el.querySelectorAll<HTMLElement>("[data-body]")) b.hidden = b.dataset.body !== t;
+    layout();
     try {
       localStorage.setItem("qd-tab", t);
     } catch { /* ignore */ }
@@ -32,7 +49,14 @@ export function createMenu(el: HTMLElement): { travel: HTMLElement; markers: HTM
   return {
     travel: el.querySelector<HTMLElement>('[data-body="travel"]')!,
     markers: el.querySelector<HTMLElement>('[data-body="markers"]')!,
+    searchBox: el.querySelector<HTMLElement>(".menu-search")!,
+    results: el.querySelector<HTMLElement>("[data-results]")!,
     show,
+    searching: (on) => {
+      if (on === inSearch) return;
+      inSearch = on;
+      layout();
+    },
   };
 }
 

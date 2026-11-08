@@ -25,11 +25,15 @@ export class NoclipControls {
       this.apply();
     });
     window.addEventListener("keydown", (e) => {
+      // Typing in a text field (the menu search) must not fly the camera.
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
       if (document.pointerLockElement === dom && e.code === "Space") e.preventDefault();
       this.keys.add(e.code);
     });
     window.addEventListener("keyup", (e) => this.keys.delete(e.code));
     window.addEventListener("blur", () => this.keys.clear());
+    window.addEventListener("focusin", () => this.keys.clear());
     dom.addEventListener(
       "wheel",
       (e) => {

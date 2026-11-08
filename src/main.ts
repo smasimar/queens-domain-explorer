@@ -15,6 +15,7 @@ import {
   WebGLRenderer,
 } from "three";
 import { clearAllCaches, readLastNamespace } from "./cache.ts";
+import type { CollectiblePoint } from "./protocol.ts";
 import { CollectibleLayer, describe, pickNearCentre } from "./viewer/collectibles.ts";
 import { Compass3D } from "./viewer/compass.ts";
 import { NoclipControls } from "./viewer/controls.ts";
@@ -22,6 +23,8 @@ import {
   createMarkers,
   describeLocation,
   flyTo,
+  flyToSpot,
+  LANDMARK,
   locationVisible,
   renderLocationList,
   updateMarkers,
@@ -36,11 +39,12 @@ import {
   type SaveState,
   savesFromFiles,
 } from "./viewer/savefolder.ts";
-import { loadSettings, saveSettings } from "./viewer/settings.ts";
+import { Search, type SearchEntry } from "./viewer/search.ts";
+import { CATEGORY_BY_ID, loadSettings, saveSettings } from "./viewer/settings.ts";
 import { createWorkerApi } from "./viewer/rpc.ts";
 import { applyGameTheme } from "./viewer/theme.ts";
 import { World } from "./viewer/world.ts";
-import { ALL_LEVELS, areaLabel, learnAreaNames, PHASE1_LEVELS } from "./viewer/zones.ts";
+import { ALL_LEVELS, areaLabel, learnAreaNames, PHASE1_LEVELS, zoneFamily } from "./viewer/zones.ts";
 import "@fontsource/arvo/400.css";
 import "@fontsource/arvo/400-italic.css";
 import "./style.css";
@@ -179,12 +183,72 @@ async function start(sceneData: Awaited<ReturnType<typeof api.scene>>) {
     onSelect: (slot) => useSlot(slot),
   };
   const renderPanel = () => renderMarkersPanel(tabs.markers, model);
+
+  // ---- search: collectibles and landmarks by name ----
+  const search = new Search(tabs.searchBox, tabs.results, tabs.searching);
+  const entries: SearchEntry[] = [];
+  for (const s of collectibles.all()) {
+    const p = s.userData.point as CollectiblePoint;
+    const cat = CATEGORY_BY_ID.get(p.category);
+    const one = cat?.one ?? p.category;
+    const fam = zoneFamily(p.level);
+    const opens = p.category === "chests" || p.category === "doors";
+    const foe = p.category === "enemies";
+    entries.push({
+      name: p.count > 1 ? `${p.name} ×${p.count}` : p.name,
+      detail: [one !== p.name ? one : null, p.hiddenBy, areaLabel(fam)].filter(Boolean).join(" · "),
+      color: cat?.color ?? "#fff",
+      kind: "item",
+      keywords: `${cat?.label ?? ""} ${p.level}`,
+      state: () => {
+        if (!progress) return null;
+        const c = s.userData.collected as boolean | null;
+        if (c === null) return null;
+        return { done: c, text: opens ? (c ? "opened" : "not opened") : foe ? (c ? "killed" : "not killed") : c ? "collected" : "not collected" };
+      },
+      go: () => {
+        // Make sure the result is drawn: its category on, collected ones shown, in range.
+        let changed = false;
+        if (!settings.cats[p.category]) settings.cats[p.category] = changed = true;
+        if (s.userData.collected === true && !settings.showCollected) settings.showCollected = changed = true;
+        if (settings.range < 30) {
+          settings.range = 30;
+          changed = true;
+        }
+        if (changed) model.onSettings();
+        flyToSpot(s.position, camera, controls);
+      },
+    });
+  }
+  for (const g of sceneData.locations) {
+    for (const p of g.points) {
+      const name = p.kind === "fasttravel" ? p.name : p.name || g.area;
+      entries.push({
+        name,
+        detail: [LANDMARK[p.kind], name !== g.area ? g.area : null].filter(Boolean).join(" · "),
+        color: "",
+        kind: p.kind,
+        keywords: p.level ?? "",
+        state: () => (progress && !progress.unlocked(p) ? { text: "not unlocked", done: false } : null),
+        go: () => {
+          if (progress && !progress.unlocked(p) && !settings.showLocked) {
+            settings.showLocked = true;
+            model.onSettings();
+          }
+          flyTo(p, camera, controls);
+        },
+      });
+    }
+  }
+  search.setEntries(entries);
+
   const useSlot = (slot: SaveSlot | null) => {
     model.selected = slot;
     progress = slot ? new Progress(slot.progress) : null;
     collectibles.setProgress(progress);
     renderTravel();
     renderPanel();
+    search.render();
   };
   const setSave = (state: SaveState) => {
     model.save = state;
@@ -233,6 +297,11 @@ async function start(sceneData: Awaited<ReturnType<typeof api.scene>>) {
       model.onSettings();
     } else if (e.code === "KeyM") {
       menu.classList.toggle("collapsed");
+    } else if (e.code === "KeyF") {
+      e.preventDefault();
+      document.exitPointerLock();
+      menu.classList.remove("collapsed");
+      search.focus();
     } else if (e.code === "KeyL") {
       const on = !(settings.teleporters || settings.saves);
       settings.teleporters = settings.saves = on;

@@ -3,7 +3,11 @@ import { Color } from "three";
 /** Phase 1: the starting area (Isle of Neasied surface + GR). */
 export const PHASE1_LEVELS = ["050_Ocean", "070_UpperShell", "100_GR", "130_GR_outerisles", "140_GR_ShopIsleOnly", "VideoConfigMap"];
 
-/** All world sublevels (cutscene/intro/menu maps excluded). */
+/**
+ * All world sublevels (cutscene/intro/menu maps excluded). 900_SipehaWorld (the
+ * final boss arena and its water) is left out too: it has no pickups and the
+ * player only gets there during the boss fight.
+ */
 export const ALL_LEVELS = [
   "000_Shared_Base_Lighting", "050_Ocean", "060_Ocean_Shadow", "070_UpperShell",
   "100_GR", "110_GR_dungeon", "120_GR_goldenroom", "125_GR_CubeHall", "130_GR_outerisles", "140_GR_ShopIsleOnly", "VideoConfigMap",
@@ -11,7 +15,7 @@ export const ALL_LEVELS = [
   "400_MAUS_entrance", "420_MAUS_mid", "450_MAUS_darkmaze", "500_AUT", "510_AUT_droptunnel",
   "600_Castle", "610_Castle_Ext", "700_SZ_GR", "710_SZ_AQ", "720_SZ_LIB", "730_HOD", "740_SZ_Prison",
   "750_SZ_MAUS2", "760_SZ_AUT", "760_Dekanima", "770_SZ_Swamp", "775_JigekiTemple", "780_SZ_Depths", "790_SG",
-  "800_FinalZone", "900_SipehaWorld", "990_B33sment",
+  "800_FinalZone", "990_B33sment",
 ];
 
 /** Zone family code for a sublevel name. */
@@ -58,6 +62,16 @@ const AREA_NAMES: Record<string, string> = {
   MAUS: "Deimpo Mausoleum",
   AUT: "Ancient World",
   Castle: "Siraatsu Castle",
+  // The game has no area name for these zones (no Wing Altar or Crystal Monument
+  // names them). These labels come from in-game text:
+  "SZ AQ": "Obmuer Temple Vault", // Treasure Hunter's Note III: "this vault"
+  "SZ LIB": "Tower of Knowledge Depths",
+  "SZ MAUS2": "Puwema's Temple", // unused string pt_areaname; Josami guard Puwema's temple
+  HOD: "Primeval Shrine", // the Okbujo shrine: "Primeval Shrine Engraving"
+  Dekanima: "Dekanima",
+  JigekiTemple: "Jigeki's Temple", // Muagyo's Journey notes
+  Final: "Final Zone",
+  B33sment: "B33sment",
 };
 
 /**
@@ -87,5 +101,5 @@ export function learnAreaNames(points: { level: string | null; area: string }[])
 /** HUD label for a zone family, e.g. "Ancient World (AUT)". */
 export function areaLabel(family: string): string {
   const name = AREA_NAMES[family] ?? learnedNames.get(family);
-  return name ? `${name} (${family})` : family;
+  return name && name !== family ? `${name} (${family})` : family;
 }

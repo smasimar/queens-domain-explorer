@@ -223,6 +223,11 @@ export class CollectibleLayer {
     this.applySkins();
   }
 
+  /** Every collectible sprite (userData: point, collected). */
+  all(): readonly Sprite[] {
+    return this.sprites;
+  }
+
   counts(): Map<string, CategoryCount> {
     const out = new Map<string, CategoryCount>();
     for (const s of this.sprites) {

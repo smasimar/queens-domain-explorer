@@ -264,3 +264,32 @@ button.opt.inline span { flex: none; }
 /* Lift the diamond to the optical middle of the text (between baseline and cap height). */
 button.opt.inline i { width: 8px; height: 8px; transform: translateY(-0.15em) rotate(45deg); }
 body.qd-theme button.opt.inline { font-size: 13px; padding: 2px 8px; }
+
+/* ---- Search ---- */
+.menu-search { display: flex; align-items: center; gap: 6px; padding: 0 14px 10px; }
+.menu-search input {
+  flex: 1; min-width: 0; font: inherit; color: var(--fg); background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.15); border-radius: 5px; padding: 5px 8px; outline: none;
+}
+.menu-search input:focus { border-color: var(--accent); }
+.menu-search input::placeholder { color: var(--muted); }
+button.loc.hit { align-items: flex-start; }
+button.loc.hit span { flex: 1; min-width: 0; }
+button.loc.hit b { display: block; font-weight: 400; }
+button.loc.hit small { display: block; font-size: 11px; color: var(--muted); white-space: pre-line; }
+button.loc.hit i { margin-top: 4px; }
+button.loc.hit.item i { width: 8px; height: 8px; transform: rotate(45deg); background: var(--c); }
+button.loc.hit.done { opacity: 0.55; }
+button.loc.hit:focus-visible { outline: 1px solid var(--accent); }
+body.qd-theme .menu-search { padding: 0 2px 10px; }
+body.qd-theme .menu-search input {
+  font-size: 16px; color: #f2eee2; border-radius: 0; border: 0; padding: 6px 10px;
+  background: var(--qd-panel) 0 0 / 256px repeat, #2b3220;
+  box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6), inset -2px -2px 0 rgba(255,255,255,0.22);
+  text-shadow: 0 1px 2px #000;
+}
+body.qd-theme .menu-search input::placeholder { color: rgba(242,238,226,0.55); }
+body.qd-theme .menu-search input:focus { box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6), inset -2px -2px 0 rgba(255,255,255,0.22), 0 0 0 2px #8fb35a; }
+body.qd-theme .menu-search kbd { color: #f2eee2; border-color: rgba(0,0,0,0.5); background: rgba(0,0,0,0.25); }
+body.qd-theme button.loc.hit small { font-size: 13px; color: rgba(242,238,226,0.75); }
+body.qd-theme button.loc.hit.item i { box-shadow: 0 1px 1px #000; }
