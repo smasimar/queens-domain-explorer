@@ -4,6 +4,11 @@ Free-fly through the world of **Queen's Domain** in 3D, in your browser.
 
 **Live app:** https://smasimar.github.io/queens-domain-explorer/
 
+**Wiki:** https://github.com/smasimar/queens-domain-explorer/wiki — game mechanics
+researched from the game's own data: exact numbers for every accessory, consumable,
+Main Weapon and Throwing Weapon, and how damage, damage types, status effects,
+stagger, weapon XP and special charges work.
+
 > **You need your own copy of the game.** This repository and the web app contain
 > no game assets. The app reads `QueensDomain-WindowsNoEditor.pak` from your disk
 > and parses it inside your browser tab. Nothing is uploaded.
