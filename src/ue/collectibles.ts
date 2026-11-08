@@ -13,10 +13,9 @@ export type CollectibleCategory =
   | "health"
   | "upgrades"
   | "treasure"
-  | "coins"
-  | "consumables"
   | "notes"
-  | "chests";
+  | "chests"
+  | "doors";
 
 /** One placed collectible, in UE world space. */
 export interface PlacedCollectible {
@@ -31,7 +30,13 @@ export interface PlacedCollectible {
   noteKey: string | null;
   /** Notes: the display title. */
   title: string | null;
-  kind: "pickup" | "note" | "chest";
+  kind: "pickup" | "note" | "chest" | "door";
+  /**
+   * Doors opened by levers, runes or switches save no state of their own: one GUID
+   * list per activator, and how many activators must be in the save.
+   */
+  activators: string[][];
+  required: number;
   /** What hides this pickup until it is activated (chest, crate, secret wall...). */
   hiddenBy: string | null;
   xform: Xform;
@@ -47,8 +52,30 @@ export interface ClassInfo {
 export const PICKUP_BASE = "/Game/Blueprints/CoreItemPickupActor.CoreItemPickupActor_C";
 const NOTE_CLASS = /\/(Oldnotes_00_Inspect_BP|InspectText)\./;
 const CHEST_CLASS = /Chest/;
+/** Secret walls; the "Concealed Passages" challenge counts the ones without Don'tCountForAchievement. */
+const DOOR_CLASS = "/Game/Blueprints/SecretWall.SecretWall_C";
 /** Properties that list the actors an activator reveals. */
 const ACTIVATOR_PROPS = ["ActorsToActivateOnOpen", "ActorsToActivateOnBreak", "ActivatableTargets"];
+
+function guidsOf(p: Props): string[] {
+  return Array.isArray(p.GUIDs)
+    ? (p.GUIDs as unknown[]).filter((g): g is string => typeof g === "string")
+    : typeof p.GUID === "string"
+    ? [p.GUID]
+    : [];
+}
+
+/** Export indices an actor's properties point at (any depth). */
+function refsIn(v: unknown, out: Set<number>): Set<number> {
+  if (Array.isArray(v)) for (const x of v) refsIn(x, out);
+  else if (v && typeof v === "object") {
+    if ("ref" in v) {
+      const r = (v as ObjectRef).ref;
+      if (r > 0) out.add(r);
+    } else for (const x of Object.values(v)) refsIn(x, out);
+  }
+  return out;
+}
 
 function ref(v: unknown): number {
   return v && typeof v === "object" && "ref" in v ? (v as ObjectRef).ref : 0;
@@ -147,6 +174,7 @@ export async function parseLevelCollectibles(
     if (!cls.startsWith("/Game/")) continue;
     const isNote = NOTE_CLASS.test(cls);
     const isChest = CHEST_CLASS.test(cls);
+    const isDoor = cls === DOOR_CLASS;
     const isActivator = /Chest|Crate|Barrel|pot|SecretWall/i.test(cls);
     const info = isNote ? null : await classInfo(cls);
     const isPickup = !!info?.chain.includes(PICKUP_BASE);
@@ -159,14 +187,11 @@ export async function parseLevelCollectibles(
         for (const t of list) if (ref(t) > 0) hiddenBy.set(ref(t), hiderLabel(cls));
       }
     }
-    if (!isNote && !isPickup && !isChest) continue;
+    if (isDoor && p["Don'tCountForAchievement"] === true) continue;
+    if (!isNote && !isPickup && !isChest && !isDoor) continue;
     const root = ref(p.RootComponent);
     if (root <= 0) continue;
-    const guids = Array.isArray(p.GUIDs)
-      ? (p.GUIDs as unknown[]).filter((g): g is string => typeof g === "string")
-      : typeof p.GUID === "string"
-      ? [p.GUID]
-      : [];
+    const guids = guidsOf(p);
     let item: string | null = null;
     let count = 1;
     if (isPickup && info) {
@@ -186,30 +211,59 @@ export async function parseLevelCollectibles(
       guids,
       noteKey: typeof p.ImportKey === "string" && p.ImportKey ? p.ImportKey : null,
       title: title ? title.key ?? title.text ?? null : null,
-      kind: isNote ? "note" : isPickup ? "pickup" : "chest",
+      kind: isNote ? "note" : isPickup ? "pickup" : isDoor ? "door" : "chest",
       hiddenBy: null,
+      activators: [],
+      required: isDoor && typeof p.ActivationCountRequirement === "number" ? p.ActivationCountRequirement : 1,
       xform: worldOf(root),
     });
   }
+  // Doors in ActivatableMode open from other actors (levers, runes, switches,
+  // other walls) and only those actors save their state.
+  const switched = new Map(out.filter((c) => c.kind === "door" && propsOf(c.index).ActivatableMode === true).map((c) => [c.index, c]));
+  if (switched.size) {
+    for (let i = 0; i < pkg.exports.length; i++) {
+      const e = pkg.exports[i];
+      const outer = pkg.exports[e.outerIndex - 1];
+      if (!outer || pkg.exportClass(outer) !== "Level" || e.classIndex >= 0 || switched.has(i + 1)) continue;
+      if (!pkg.importPath(e.classIndex).startsWith("/Game/")) continue;
+      const p = propsOf(i + 1);
+      const g = guidsOf(p);
+      if (!g.length) continue;
+      for (const r of refsIn(p, new Set())) switched.get(r)?.activators.push(g);
+    }
+  }
   for (const c of out) {
+    if (c.kind === "door") {
+      c.hiddenBy = c.activators.length ? (c.required > 1 ? `opens with ${c.required} switches` : "opens with a switch") : null;
+      continue;
+    }
     c.hiddenBy = hiddenBy.get(c.index) ?? (c.kind === "pickup" && propsOf(c.index).RequireActivation === true ? "hidden" : null);
   }
   return out.map(({ index: _i, ...c }) => c);
 }
 
-/** Map an item (class path + item data category enum) to a viewer category. */
-export function categorize(cls: string, itemCategory: string | null, kind: PlacedCollectible["kind"]): CollectibleCategory {
+/**
+ * Map an item (class path + item data category enum) to a viewer category.
+ * Null for coins and consumables, which the viewer does not show.
+ */
+export function categorize(
+  cls: string,
+  itemCategory: string | null,
+  kind: PlacedCollectible["kind"],
+): CollectibleCategory | null {
   if (kind === "note") return "notes";
   if (kind === "chest") return "chests";
+  if (kind === "door") return "doors";
   const n = Number(/NewEnumerator(\d+)/.exec(itemCategory ?? "")?.[1] ?? -1);
   if (/\/KeyItems\/Egg\//.test(cls)) return "eggs";
   if (/\/SecretRelicKey\//.test(cls)) return "skulls";
   if (/\/Upgrades\/\w+_Upgrade\//.test(cls)) return "health";
   if (/\/(Upgrades|ScientistUpgrades)\/|RuneVisionUnlock|GrimoireInk/.test(cls)) return "upgrades";
-  if (/\/Treasure\/Coins\//.test(cls)) return "coins";
+  if (/\/Treasure\/Coins\//.test(cls)) return null;
   switch (n) {
     case 0:
-      return "consumables";
+      return null;
     case 1:
       return "accessories";
     case 2:

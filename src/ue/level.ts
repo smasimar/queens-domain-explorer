@@ -33,7 +33,7 @@ function ref(v: unknown): number {
   return v && typeof v === "object" && "ref" in v ? (v as ObjectRef).ref : 0;
 }
 
-/** A placed save altar (Checkpoint_C) or fast-travel altar (Teleporter_C). */
+/** A placed Crystal Monument (Checkpoint_C) or Wing Altar (Teleporter_C). */
 export interface PlacedAltar {
   kind: "fasttravel" | "save";
   /** LocationData asset path, e.g. /Game/Blueprints/Areas/1GreenRuins/GR_Camp_Save.GR_Camp_Save */
@@ -92,7 +92,7 @@ export function parseLevelGeometry(pkg: Package, levelXform: Xform = IDENTITY): 
   return out;
 }
 
-/** Find save and fast-travel altar actors in a sublevel. */
+/** Find Crystal Monument and Wing Altar actors in a sublevel. */
 export function parseLevelAltars(pkg: Package, levelXform: Xform = IDENTITY): PlacedAltar[] {
   const { propsOf, worldOf } = transformResolver(pkg, levelXform);
   const out: PlacedAltar[] = [];

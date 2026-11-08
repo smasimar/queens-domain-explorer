@@ -193,7 +193,7 @@ body.qd-theme:not(:has(#menu.collapsed)) #help { left: calc(50% + 150px); max-wi
 
 /* ---- Menu tabs + Markers tab ---- */
 #hover {
-  left: 50%; top: calc(50% + 14px); transform: translateX(-50%); white-space: nowrap;
+  left: 50%; top: calc(50% + 14px); transform: translateX(-50%); white-space: pre; text-align: center;
   font-size: 15px; color: #f2eee2; text-shadow: 0 1px 2px #000, 0 0 6px #000;
 }
 .menu-tabs { display: flex; gap: 4px; }

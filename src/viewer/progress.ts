@@ -23,7 +23,12 @@ export class Progress {
     // A few unique pickups have no save GUID: the save only records the item
     // (owned, used up or sold). Each is the only placement of its item.
     if (!p.guids.length) return p.item ? this.items.has(p.item) : null;
-    return p.guids.some((g) => this.states.has(g));
+    if (p.guids.some((g) => this.states.has(g))) return true;
+    // Switch-opened secret doors: the switches save their state, the door does not.
+    if (p.activators?.length) {
+      return p.activators.filter((a) => a.some((g) => this.states.has(g))).length >= (p.required ?? 1);
+    }
+    return false;
   }
 
   unlocked(p: LocationPoint): boolean {

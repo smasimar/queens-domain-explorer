@@ -9,7 +9,7 @@ export function createMenu(el: HTMLElement): { travel: HTMLElement; markers: HTM
   el.innerHTML = `
     <div class="menu-head">
       <div class="menu-tabs" role="tablist">
-        <button class="menu-tab" data-tab="travel" role="tab">Fast Travel</button>
+        <button class="menu-tab" data-tab="travel" role="tab">Wing Altars</button>
         <button class="menu-tab" data-tab="markers" role="tab">Markers</button>
       </div>
       <kbd>M</kbd>
@@ -134,8 +134,8 @@ export function renderMarkersPanel(el: HTMLElement, m: MarkersModel): void {
       : null,
   );
   marks.append(
-    row("toggle", `<i></i><span>Teleporters</span>`, change(() => (s.teleporters = !s.teleporters)), s.teleporters),
-    row("toggle", `<i></i><span>Save points</span>`, change(() => (s.saves = !s.saves)), s.saves),
+    row("toggle", `<i></i><span>Wing Altars</span>`, change(() => (s.teleporters = !s.teleporters)), s.teleporters),
+    row("toggle", `<i></i><span>Crystal Monuments</span>`, change(() => (s.saves = !s.saves)), s.saves),
   );
   el.append(marks);
 

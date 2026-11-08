@@ -27,19 +27,21 @@ Free-fly through the world of **Queen's Domain** in 3D, in your browser.
 | Shift | Boost |
 | Mouse wheel | Change speed |
 | T | Toggle zone tint |
-| L | Toggle travel point markers |
+| L | Toggle Wing Altar and Crystal Monument markers |
 | M | Show / hide the menu |
 | Esc | Release the mouse |
 
 The menu (left) has two tabs:
 
-- **Fast Travel** lists every fast-travel and save altar, grouped by area. Click an
-  entry to fly there.
-- **Markers** has display toggles (zone tint, draw range), landmarks (teleporters,
-  save points) and a toggle for each collectible category (weapons, sub-weapons, accessories, eggs, skulls, keys,
-  health and other upgrades, treasure, chests, coins, consumables, notes), and a
-  draw range. Point the crosshair at a marker to see its name and where it hides
-  (in chest, in crate, behind secret wall).
+- **Wing Altars** lists every Wing Altar and Crystal Monument, grouped by area.
+  Click an entry to fly there.
+- **Markers** has display toggles (zone tint, draw range), landmarks (Wing Altars,
+  Crystal Monuments) and a toggle for each collectible category (Main Weapons, Throwing
+  Weapons, accessories, Orbewa Eggs, Strange Skulls, keys, Meals and other upgrades, treasure,
+  chests, secret doors, notes). Point the crosshair at a marker to
+  see its name and where it hides (in chest, in crate, behind secret wall). Crystal
+  Monuments show their area and name. Secret doors are the 89 that the
+  "Concealed Passages" challenge counts.
 
 The compass (top right) is the game's own compass sphere.
 
@@ -49,7 +51,7 @@ In **Markers → Save**, select your save file, `World0.sav`, in
 `%LOCALAPPDATA%\QueensDomain\Saved\SaveGames\<SteamID>`. Select the
 `World0_Suspend_*.sav` files too to switch between them. The newest is selected.
 The app greys out what you already collected (turn off **Show collected** to hide it),
-shows counts like `Eggs 49/50`, and hides teleporters and save points you have not
+shows counts like `Orbewa Eggs 49/50`, and hides Wing Altars and Crystal Monuments you have not
 unlocked (turn on **Show locked** to see them). You can also drop the `.sav` files
 on the page. The saves are read in the browser only. The app keeps a copy in the
 browser's private storage (OPFS) and loads it on the next visit. After you play,
@@ -66,7 +68,7 @@ URL options: `?levels=phase1` loads only the starting area;
   UE save files (GVAS).
 - `src/worker.ts` parses in a Web Worker and caches results in OPFS.
 - `src/viewer/` renders with three.js: noclip camera, zone tint, HUD, compass,
-  fast-travel menu. The menu uses the game's own UI font and textures, read from
+  Wing Altar menu. The menu uses the game's own UI font and textures, read from
   your pak at runtime.
 
 ## Development

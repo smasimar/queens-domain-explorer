@@ -13,9 +13,9 @@ export interface SceneActor {
 export interface LocationPoint {
   kind: "fasttravel" | "save";
   name: string;
-  /** Altar position (or the game's travel destination if the altar is not in a loaded sublevel). */
+  /** Landmark position (or the game's travel destination if it is not in a loaded sublevel). */
   position: [number, number, number];
-  /** Altar facing (unit vector). */
+  /** Landmark facing (unit vector). */
   forward: [number, number, number];
   placed: boolean;
   level: string | null;
@@ -23,7 +23,7 @@ export interface LocationPoint {
   asset: string;
 }
 
-/** A placed collectible (pickup, lore note or chest). */
+/** A placed collectible (pickup, lore note, chest or secret door). */
 export interface CollectiblePoint {
   /** "<level>/<actor>", unique. */
   id: string;
@@ -42,6 +42,9 @@ export interface CollectiblePoint {
   hiddenBy: string | null;
   /** Item icon texture path. */
   icon: string | null;
+  /** Secret doors opened by switches: save GUIDs per switch, and how many must be set. */
+  activators?: string[][];
+  required?: number;
 }
 
 export interface LocationGroup {

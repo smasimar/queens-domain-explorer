@@ -15,6 +15,35 @@ interface Skin {
   color: string;
   grey: boolean;
   icon: HTMLCanvasElement | null;
+  /** Drawn glyph instead of an item icon (secret doors have no game icon). */
+  glyph: ((g: CanvasRenderingContext2D, c: number, color: string) => void) | null;
+}
+
+/** Secret door: a brick wall with an arrow showing it slides open. */
+function slidingWall(g: CanvasRenderingContext2D, c: number, color: string): void {
+  const bw = 8, bh = 6, gap = 1.5;
+  const left = c - 17, top = c - 13;
+  g.fillStyle = color;
+  g.save();
+  g.beginPath();
+  g.rect(left, top, 3 * bw + 2 * gap, 4 * bh + 3 * gap);
+  g.clip();
+  for (let r = 0; r < 4; r++) {
+    const off = r % 2 ? -(bw + gap) / 2 : 0;
+    for (let k = 0; k < 4; k++) g.fillRect(left + off + k * (bw + gap), top + r * (bh + gap), bw, bh);
+  }
+  g.restore();
+  g.strokeStyle = "#fff";
+  g.lineWidth = 3;
+  g.lineCap = "round";
+  g.lineJoin = "round";
+  g.beginPath();
+  g.moveTo(c + 11, c);
+  g.lineTo(c + 20, c);
+  g.moveTo(c + 16, c - 5);
+  g.lineTo(c + 21, c);
+  g.lineTo(c + 16, c + 5);
+  g.stroke();
 }
 
 function iconCanvas(img: UiImage): HTMLCanvasElement {
@@ -44,7 +73,8 @@ function draw(s: Skin): void {
   g.lineWidth = 5;
   g.strokeStyle = s.color;
   g.stroke();
-  if (s.icon) {
+  if (s.glyph) s.glyph(g, c, s.color);
+  else if (s.icon) {
     const k = (SIZE - 16) / Math.max(s.icon.width, s.icon.height);
     const w = s.icon.width * k, h = s.icon.height * k;
     g.drawImage(s.icon, c - w / 2, c - h / 2, w, h);
@@ -105,7 +135,6 @@ export class CollectibleLayer {
   private skins = new Map<string, Skin>();
   private icons = new Map<string, Promise<HTMLCanvasElement | null>>();
   private progress: Progress | null = null;
-  private tmp = new Vector3();
 
   readonly points: CollectiblePoint[];
 
@@ -131,10 +160,10 @@ export class CollectibleLayer {
     canvas.width = canvas.height = SIZE;
     const texture = new CanvasTexture(canvas);
     const material = new SpriteMaterial({ map: texture, depthTest: false, sizeAttenuation: false, transparent: true });
-    s = { canvas, texture, material, color: CATEGORY_BY_ID.get(p.category)?.color ?? "#fff", grey, icon: null };
+    s = { canvas, texture, material, color: CATEGORY_BY_ID.get(p.category)?.color ?? "#fff", grey, icon: null, glyph: p.category === "doors" ? slidingWall : null };
     this.skins.set(key, s);
     draw(s);
-    if (p.icon) {
+    if (p.icon && !s.glyph) {
       const skin = s;
       this.loadIcon(p.icon).then((icon) => {
         if (!icon) return;
@@ -191,33 +220,49 @@ export class CollectibleLayer {
   }
 
   /** The visible collectible nearest the screen centre, within a few pixels. */
-  pick(camera: PerspectiveCamera, width: number, height: number): Sprite | null {
-    let best: Sprite | null = null;
-    let bestD = PICK_PX * PICK_PX;
-    for (const s of this.sprites) {
-      if (!s.visible) continue;
-      const v = this.tmp.copy(s.position).project(camera);
-      if (v.z > 1) continue;
-      const dx = (v.x * width) / 2, dy = (v.y * height) / 2;
-      const d = dx * dx + dy * dy;
-      if (d < bestD) {
-        bestD = d;
-        best = s;
-      }
-    }
-    return best;
+  pick(camera: PerspectiveCamera, width: number, height: number): ScreenPick | null {
+    return pickNearCentre(this.sprites, camera, width, height);
   }
+}
+
+export interface ScreenPick {
+  sprite: Sprite;
+  /** Squared pixel distance from the screen centre. */
+  d2: number;
+}
+
+const tmp = new Vector3();
+
+/** The visible sprite nearest the screen centre, within PICK_PX. */
+export function pickNearCentre(
+  sprites: Iterable<Sprite>,
+  camera: PerspectiveCamera,
+  width: number,
+  height: number,
+): ScreenPick | null {
+  let best: ScreenPick | null = null;
+  for (const s of sprites) {
+    if (!s.visible) continue;
+    const v = tmp.copy(s.position).project(camera);
+    if (v.z > 1) continue;
+    const dx = (v.x * width) / 2, dy = (v.y * height) / 2;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < PICK_PX * PICK_PX && (!best || d2 < best.d2)) best = { sprite: s, d2 };
+  }
+  return best;
 }
 
 /** HUD text for a hovered collectible. */
 export function describe(s: Sprite, hasSave: boolean): string {
   const p = s.userData.point as CollectiblePoint;
-  const cat = CATEGORY_BY_ID.get(p.category)?.label ?? p.category;
-  const parts = [p.count > 1 ? `${p.name} ×${p.count}` : p.name, cat];
+  const opens = p.category === "chests" || p.category === "doors";
+  const parts = [p.count > 1 ? `${p.name} ×${p.count}` : p.name];
+  // "Chest" and "Secret door" already name their category.
+  if (!opens) parts.push(CATEGORY_BY_ID.get(p.category)?.label ?? p.category);
   if (p.hiddenBy) parts.push(p.hiddenBy);
   if (hasSave) {
     const c = s.userData.collected as boolean | null;
-    parts.push(c === null ? "save state unknown" : c ? (p.category === "chests" ? "opened" : "collected") : "not collected");
+    parts.push(c === null ? "save state unknown" : opens ? (c ? "opened" : "not opened") : c ? "collected" : "not collected");
   }
   return parts.join(" · ");
 }

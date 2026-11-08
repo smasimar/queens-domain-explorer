@@ -2,14 +2,14 @@ import type { Package } from "./package.ts";
 import { readProps, type Props, type Vec3 } from "./properties.ts";
 import { fromQuat, type Xform } from "./transform.ts";
 
-/** A save or fast-travel location data asset (Blueprints/Areas/<folder>/<asset>). */
+/** A Crystal Monument or Wing Altar location data asset (Blueprints/Areas/<folder>/<asset>). */
 export interface LocationAsset {
   asset: string; // object path
   folder: string; // e.g. "1GreenRuins"
   kind: "fasttravel" | "save";
   /** Area display name, e.g. "Isle of Neasied". */
   area: string;
-  /** Point display name, e.g. "Knight's Encampment" (fast travel: area name). */
+  /** Point display name, e.g. "Knight's Encampment" (Wing Altar: area name). */
   name: string;
   sort: number;
   /** Where the game puts the player when travelling here. */

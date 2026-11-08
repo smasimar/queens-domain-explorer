@@ -29,7 +29,7 @@ import { readProps } from "./ue/properties.ts";
 import { IDENTITY, toThreeMatrix, ueToThreePoint, UNIT, type Xform } from "./ue/transform.ts";
 
 /** Bump when parser output changes, to invalidate caches. */
-const CACHE_VERSION = "v8";
+const CACHE_VERSION = "v10";
 const PERSISTENT = "/Game/RuinsLevel/Maps/Ruins_Level_00";
 const STRING_TABLE = "/Game/StringTables/ImportedStringTable";
 const ALTAR_MESH = {
@@ -72,7 +72,7 @@ function threeForward(x: Xform): [number, number, number] {
   return [x.r[0], x.r[6], x.r[3]];
 }
 
-/** Group save / fast-travel points by area: fast travel first, then saves in game order. */
+/** Group Crystal Monuments / Wing Altars by area: the Wing Altar first, then monuments in game order. */
 async function loadStrings(): Promise<Map<string, string>> {
   const stPkg = await loadPkg(STRING_TABLE);
   return stPkg ? parseStringTable(stPkg) : new Map<string, string>();
@@ -114,12 +114,16 @@ async function buildCollectibles(placed: PlacedCollectible[], strings: Map<strin
     const data = c.item ? await itemData(c.item) : null;
     const name = c.kind === "chest"
       ? "Chest"
+      : c.kind === "door"
+      ? "Secret door"
       : c.kind === "note"
       ? (c.title ? strings.get(c.title) ?? c.title : "Note")
       : data?.name ?? c.cls.split(".")[1];
+    const category = categorize(c.cls, data?.category ?? null, c.kind);
+    if (!category) continue;
     out.push({
       id: `${c.level}/${c.actor}`,
-      category: categorize(c.cls, data?.category ?? null, c.kind),
+      category,
       name,
       count: c.count,
       position: ueToThreePoint(c.xform.t),
@@ -129,6 +133,7 @@ async function buildCollectibles(placed: PlacedCollectible[], strings: Map<strin
       item: c.kind === "pickup" ? c.item : null,
       hiddenBy: c.hiddenBy,
       icon: data?.icon ?? null,
+      ...(c.activators.length ? { activators: c.activators, required: c.required } : {}),
     });
   }
   return out;
@@ -145,7 +150,7 @@ async function buildLocations(altars: { level: string; altar: PlacedAltar }[]): 
     const a = pkg && parseLocationAsset(pkg, strings);
     if (a) assets.push(a);
   }
-  // Unnamed areas ("???") take the fast-travel area name of the same folder.
+  // Unnamed areas ("???") take the Wing Altar area name of the same folder.
   const folderArea = new Map(assets.filter((a) => a.kind === "fasttravel").map((a) => [a.folder, a.area]));
   for (const a of assets) if (!a.area || /^\?+$/.test(a.area)) a.area = folderArea.get(a.folder) ?? a.area;
 

@@ -9,15 +9,23 @@ import {
   PerspectiveCamera,
   Raycaster,
   Scene,
+  type Sprite,
   SRGBColorSpace,
   Vector3,
   WebGLRenderer,
 } from "three";
 import { clearAllCaches, readLastNamespace } from "./cache.ts";
-import { CollectibleLayer, describe } from "./viewer/collectibles.ts";
+import { CollectibleLayer, describe, pickNearCentre } from "./viewer/collectibles.ts";
 import { Compass3D } from "./viewer/compass.ts";
 import { NoclipControls } from "./viewer/controls.ts";
-import { createMarkers, flyTo, locationVisible, renderLocationList, updateMarkers } from "./viewer/locations.ts";
+import {
+  createMarkers,
+  describeLocation,
+  flyTo,
+  locationVisible,
+  renderLocationList,
+  updateMarkers,
+} from "./viewer/locations.ts";
 import { createMenu, type MarkersModel, renderMarkersPanel } from "./viewer/menu.ts";
 import { Progress } from "./viewer/progress.ts";
 import {
@@ -136,7 +144,7 @@ async function start(sceneData: Awaited<ReturnType<typeof api.scene>>) {
     .catch((e) => console.warn("compass mesh failed", e));
   applyGameTheme(api);
 
-  // ---- menu: Fast Travel + Markers tabs ----
+  // ---- menu: Wing Altars + Markers tabs ----
   const menu = $("menu");
   const tabs = createMenu(menu);
   let progress: Progress | null = null;
@@ -268,8 +276,13 @@ async function start(sceneData: Awaited<ReturnType<typeof api.scene>>) {
       }
       const ud = (hit?.object as Mesh | undefined)?.userData;
       zoneLabel.textContent = ud ? `${areaLabel(ud.family)} · ${ud.level}` : "";
-      const picked = collectibles.pick(camera, innerWidth, innerHeight);
-      hover.textContent = picked ? describe(picked, !!progress) : "";
+      const item = collectibles.pick(camera, innerWidth, innerHeight);
+      const place = pickNearCentre(markers.children as Sprite[], camera, innerWidth, innerHeight);
+      hover.textContent = place && (!item || place.d2 < item.d2)
+        ? describeLocation(place.sprite, progress)
+        : item
+        ? describe(item.sprite, !!progress)
+        : "";
     }
     // Markers show through walls, so only show nearby ones.
     updateMarkers(markers, camera, settings, progress);

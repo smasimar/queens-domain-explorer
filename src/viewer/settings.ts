@@ -9,18 +9,17 @@ export interface CategoryInfo {
 
 /** Collectible categories in menu order, with their ring colour and default visibility. */
 export const CATEGORIES: CategoryInfo[] = [
-  { id: "weapons", label: "Weapons", color: "#f0c850", on: true },
-  { id: "subweapons", label: "Sub-weapons", color: "#f08a4b", on: true },
+  { id: "weapons", label: "Main Weapons", color: "#f0c850", on: true },
+  { id: "subweapons", label: "Throwing Weapons", color: "#f08a4b", on: true },
   { id: "accessories", label: "Accessories", color: "#c98cf0", on: true },
-  { id: "eggs", label: "Eggs", color: "#f4f1de", on: true },
-  { id: "skulls", label: "Skulls", color: "#9fb4bd", on: true },
+  { id: "eggs", label: "Orbewa Eggs", color: "#f4f1de", on: true },
+  { id: "skulls", label: "Strange Skulls", color: "#9fb4bd", on: true },
   { id: "keys", label: "Keys", color: "#ffe066", on: true },
-  { id: "health", label: "Health upgrades", color: "#ff6b6b", on: true },
+  { id: "health", label: "Meals", color: "#ff6b6b", on: true },
   { id: "upgrades", label: "Other upgrades", color: "#4fd8e8", on: true },
   { id: "treasure", label: "Treasure", color: "#f0a020", on: true },
   { id: "chests", label: "Chests", color: "#c08850", on: true },
-  { id: "coins", label: "Coins", color: "#d8b850", on: false },
-  { id: "consumables", label: "Consumables", color: "#8fd46b", on: false },
+  { id: "doors", label: "Secret doors", color: "#7fa8ff", on: true },
   { id: "notes", label: "Notes", color: "#d8c8a0", on: false },
 ];
 
@@ -30,7 +29,7 @@ export interface Settings {
   tint: boolean;
   teleporters: boolean;
   saves: boolean;
-  /** Show teleporters / save points that the loaded save has not unlocked. */
+  /** Show Wing Altars / Crystal Monuments that the loaded save has not unlocked. */
   showLocked: boolean;
   /** Show collected items greyed out (off: hide them). */
   showCollected: boolean;
