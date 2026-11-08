@@ -16,7 +16,10 @@ export type CollectibleCategory =
   | "notes"
   | "chests"
   | "doors"
-  | "enemies";
+  | "enemies"
+  | "mementos"
+  | "necklaces"
+  | "modules";
 
 /** One placed collectible, in UE world space. */
 export interface PlacedCollectible {
@@ -31,7 +34,7 @@ export interface PlacedCollectible {
   noteKey: string | null;
   /** Notes: the display title. */
   title: string | null;
-  kind: "pickup" | "note" | "chest" | "door" | "enemy";
+  kind: "pickup" | "note" | "chest" | "door" | "enemy" | "ghost";
   /** Enemy spawners: the EnemyData asset path. */
   enemy: string | null;
   /**
@@ -52,11 +55,15 @@ export interface ClassInfo {
   configOverride: string | null;
   /** EnemyData set on the class defaults (enemy spawners). */
   enemyData: string | null;
+  /** Memento pickup class a ghost NPC gives (MementoBP). */
+  memento: string | null;
 }
 
 export const PICKUP_BASE = "/Game/Blueprints/CoreItemPickupActor.CoreItemPickupActor_C";
 const NOTE_CLASS = /\/(Oldnotes_00_Inspect_BP|InspectText)\./;
 const CHEST_CLASS = /Chest/;
+/** Spirits of NPCs; the ones with a MementoBP give a memento for the Okbujo shrine. */
+const GHOST_BASE = "/Game/NPCs/NPC_Ghost_Base.NPC_Ghost_Base_C";
 /** Every placed enemy comes from a subclass of this spawner. */
 const SPAWNER_BASE = "/Game/Enemies/EnemySpawner.EnemySpawner_C";
 /** Secret walls; the "Concealed Passages" challenge counts the ones without Don'tCountForAchievement. */
@@ -106,7 +113,7 @@ export function classResolver(loadPkg: (path: string) => Promise<Package | null>
     let p = cache.get(path);
     if (p) return p;
     p = (async () => {
-      const info: ClassInfo = { chain: [path], grants: new Map(), configOverride: null, enemyData: null };
+      const info: ClassInfo = { chain: [path], grants: new Map(), configOverride: null, enemyData: null, memento: null };
       if (!path.startsWith("/Game/")) return info;
       const pkg = await loadPkg(path).catch(() => null);
       if (!pkg) return info;
@@ -120,6 +127,7 @@ export function classResolver(loadPkg: (path: string) => Promise<Package | null>
         info.grants = new Map(sup.grants);
         info.configOverride = sup.configOverride;
         info.enemyData = sup.enemyData;
+        info.memento = sup.memento;
       }
       const cdo = pkg.exports.find((e) => e.objectName === "Default__" + clsName);
       if (cdo) {
@@ -129,6 +137,9 @@ export function classResolver(loadPkg: (path: string) => Promise<Package | null>
         if (co < 0) info.configOverride = pkg.importPath(co);
         const ed = ref(props.EnemyData);
         if (ed < 0) info.enemyData = pkg.importPath(ed);
+        if (typeof props.MementoBP === "string" && props.MementoBP !== "None") info.memento = props.MementoBP;
+        const mb = ref(props.MementoBP);
+        if (mb < 0) info.memento = pkg.importPath(mb);
       }
       return info;
     })();
@@ -189,7 +200,8 @@ export async function parseLevelCollectibles(
     const info = isNote ? null : await classInfo(cls);
     const isPickup = !!info?.chain.includes(PICKUP_BASE);
     const isSpawner = !!info?.chain.includes(SPAWNER_BASE);
-    if (!isNote && !isPickup && !isActivator && !isSpawner) continue;
+    const isGhost = !!info?.memento && info.chain.includes(GHOST_BASE);
+    if (!isNote && !isPickup && !isActivator && !isSpawner && !isGhost) continue;
     const p = propsOf(i + 1);
     if (isActivator) {
       for (const name of ACTIVATOR_PROPS) {
@@ -205,7 +217,7 @@ export async function parseLevelCollectibles(
       enemy = ed < 0 ? pkg.importPath(ed) : info?.enemyData ?? null;
       if (!enemy) continue;
     }
-    if (!isNote && !isPickup && !isChest && !isDoor && !isSpawner) continue;
+    if (!isNote && !isPickup && !isChest && !isDoor && !isSpawner && !isGhost) continue;
     const root = ref(p.RootComponent);
     if (root <= 0) continue;
     const guids = guidsOf(p);
@@ -217,7 +229,14 @@ export async function parseLevelCollectibles(
       if (first) [item, count] = first;
       else item = info.configOverride;
     }
-    const title = p.Title && typeof p.Title === "object" ? (p.Title as { key?: string; text?: string }) : null;
+    if (isGhost && info?.memento) {
+      // The memento is the first item its pickup class grants.
+      const first = [...(await classInfo(info.memento)).grants][0];
+      if (first) item = first[0];
+    }
+    // Ghosts: their display name ("Spirit of Peha"); notes: their title.
+    const t = isGhost ? p.name ?? p.Name : p.Title;
+    const title = t && typeof t === "object" ? (t as { key?: string; text?: string }) : null;
     out.push({
       index: i + 1,
       level,
@@ -228,7 +247,7 @@ export async function parseLevelCollectibles(
       guids,
       noteKey: typeof p.ImportKey === "string" && p.ImportKey ? p.ImportKey : null,
       title: title ? title.key ?? title.text ?? null : null,
-      kind: isNote ? "note" : isPickup ? "pickup" : isDoor ? "door" : isSpawner ? "enemy" : "chest",
+      kind: isNote ? "note" : isPickup ? "pickup" : isDoor ? "door" : isSpawner ? "enemy" : isGhost ? "ghost" : "chest",
       enemy,
       hiddenBy: null,
       activators: [],
@@ -275,6 +294,9 @@ export function categorize(
   if (kind === "chest") return "chests";
   if (kind === "door") return "doors";
   if (kind === "enemy") return "enemies";
+  if (kind === "ghost") return "mementos";
+  if (/\/RaiderNecklaceKey\//.test(cls)) return "necklaces";
+  if (/\/ScientistUpgrades\/WeaponUpgradeUnlock/.test(cls)) return "modules";
   const n = Number(/NewEnumerator(\d+)/.exec(itemCategory ?? "")?.[1] ?? -1);
   if (/\/KeyItems\/Egg\//.test(cls)) return "eggs";
   if (/\/SecretRelicKey\//.test(cls)) return "skulls";

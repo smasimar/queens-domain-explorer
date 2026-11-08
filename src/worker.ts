@@ -29,7 +29,7 @@ import { readProps } from "./ue/properties.ts";
 import { IDENTITY, toThreeMatrix, ueToThreePoint, UNIT, type Xform } from "./ue/transform.ts";
 
 /** Bump when parser output changes, to invalidate caches. */
-const CACHE_VERSION = "v11";
+const CACHE_VERSION = "v15";
 const PERSISTENT = "/Game/RuinsLevel/Maps/Ruins_Level_00";
 const STRING_TABLE = "/Game/StringTables/ImportedStringTable";
 const ALTAR_MESH = {
@@ -149,6 +149,13 @@ async function buildCollectibles(placed: PlacedCollectible[], strings: Map<strin
       : data?.name ?? c.cls.split(".")[1];
     const category = categorize(c.cls, data?.category ?? null, c.kind);
     if (!category) continue;
+    if (c.kind === "ghost") {
+      // Companion spirits (other knights, raider sailors) inherit the memento class
+      // setting; only the spirit named in "<Owner>'s Memento" gives it.
+      const owner = /^(.+?)'s? Memento$/.exec(name)?.[1];
+      const spirit = c.title ? strings.get(c.title) ?? c.title : "";
+      if (!owner || !spirit.includes(owner)) continue;
+    }
     out.push({
       id: `${c.level}/${c.actor}`,
       category,
@@ -159,8 +166,10 @@ async function buildCollectibles(placed: PlacedCollectible[], strings: Map<strin
       // Spawner GUIDs are in EnemySaveStates, not SavableActorStates; kills are tracked per type.
       guids: foe ? [] : c.guids,
       noteKey: c.noteKey,
-      item: c.kind === "pickup" ? c.item : null,
-      hiddenBy: c.hiddenBy,
+      item: c.kind === "pickup" || c.kind === "ghost" ? c.item : null,
+      hiddenBy: c.kind === "ghost"
+        ? (c.title ? strings.get(c.title) ?? c.title : null)
+        : c.hiddenBy,
       icon: data?.icon ?? null,
       ...(c.activators.length ? { activators: c.activators, required: c.required } : {}),
       ...(c.enemy ? { enemy: c.enemy } : {}),

@@ -23,6 +23,9 @@ export const CATEGORIES: CategoryInfo[] = [
   { id: "chests", label: "Chests", one: "Chest", color: "#c08850", on: true },
   { id: "doors", label: "Secret doors", one: "Secret door", color: "#7fa8ff", on: true },
   { id: "enemies", label: "Unique enemies", one: "Unique enemy", color: "#e0485a", on: true },
+  { id: "mementos", label: "Mementos", one: "Memento", color: "#b8f0ff", on: true },
+  { id: "necklaces", label: "Fallen Raider's Necklaces", one: "Fallen Raider's Necklace", color: "#e8a0c8", on: true },
+  { id: "modules", label: "Data Modules", one: "Data Module", color: "#8ce0b0", on: true },
   { id: "notes", label: "Notes", one: "Note", color: "#d8c8a0", on: false },
 ];
 

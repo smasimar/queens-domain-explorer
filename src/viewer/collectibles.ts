@@ -285,7 +285,8 @@ export function describe(s: Sprite, hasSave: boolean): string {
   const foe = p.category === "enemies";
   const parts = [p.count > 1 ? `${p.name} ×${p.count}` : p.name];
   // "Chest" and "Secret door" already name their category.
-  if (!opens) parts.push(CATEGORY_BY_ID.get(p.category)?.one ?? p.category);
+  const one = CATEGORY_BY_ID.get(p.category)?.one ?? p.category;
+  if (!opens && one !== p.name) parts.push(one);
   if (p.hiddenBy) parts.push(p.hiddenBy);
   if (hasSave) {
     const c = s.userData.collected as boolean | null;

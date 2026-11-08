@@ -27,6 +27,8 @@ export class Progress {
     // (owned, used up or sold). Each is the only placement of its item.
     if (!p.guids.length) return p.item ? this.items.has(p.item) : null;
     if (p.guids.some((g) => this.states.has(g))) return true;
+    // Mementos: the ghost's state is not always saved; holding (or having offered) the memento counts.
+    if (p.category === "mementos" && p.item && this.items.has(p.item)) return true;
     // Switch-opened secret doors: the switches save their state, the door does not.
     if (p.activators?.length) {
       return p.activators.filter((a) => a.some((g) => this.states.has(g))).length >= (p.required ?? 1);
