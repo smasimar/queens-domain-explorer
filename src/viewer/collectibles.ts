@@ -62,6 +62,37 @@ function draw(s: Skin): void {
   s.texture.needsUpdate = true;
 }
 
+/** The same thing placed in two levels closer than this (metres) is one collectible. */
+const DUPLICATE_M = 2;
+
+/**
+ * Overlapping streaming levels sometimes place the same pickup twice at one spot
+ * (e.g. a Vampiric Blade in both 450_MAUS_darkmaze and 500_AUT). The game keeps
+ * one; merge them so the save state of either applies.
+ */
+export function mergeDuplicates(points: CollectiblePoint[]): CollectiblePoint[] {
+  const out: CollectiblePoint[] = [];
+  const byKey = new Map<string, CollectiblePoint[]>();
+  for (const p of points) {
+    const key = `${p.category}|${p.item ?? p.name}|${p.noteKey ?? ""}|${p.count}`;
+    const same = byKey.get(key) ?? [];
+    // Same-level clusters (e.g. four spike balls in a pile) are separate pickups.
+    const twin = same.find((q) =>
+      q.level !== p.level && Math.hypot(q.position[0] - p.position[0], q.position[1] - p.position[1], q.position[2] - p.position[2]) <
+        DUPLICATE_M
+    );
+    if (twin) {
+      twin.guids = [...twin.guids, ...p.guids];
+      continue;
+    }
+    const copy = { ...p, guids: [...p.guids] };
+    same.push(copy);
+    byKey.set(key, same);
+    out.push(copy);
+  }
+  return out;
+}
+
 export interface CategoryCount {
   total: number;
   collected: number;
@@ -76,8 +107,11 @@ export class CollectibleLayer {
   private progress: Progress | null = null;
   private tmp = new Vector3();
 
-  constructor(private api: WorkerApi, readonly points: CollectiblePoint[]) {
-    for (const p of points) {
+  readonly points: CollectiblePoint[];
+
+  constructor(private api: WorkerApi, points: CollectiblePoint[]) {
+    this.points = mergeDuplicates(points);
+    for (const p of this.points) {
       const s = new Sprite();
       s.position.set(p.position[0], p.position[1] + 0.6, p.position[2]);
       s.scale.setScalar(SCALE);
