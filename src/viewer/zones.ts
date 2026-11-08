@@ -60,8 +60,32 @@ const AREA_NAMES: Record<string, string> = {
   Castle: "Siraatsu Castle",
 };
 
+/**
+ * Area names learned from the Wing Altar / Crystal Monument data: each landmark's
+ * sublevel belongs to its area, so the sublevel's zone family gets that name.
+ * This names the secret zones (e.g. 760_SZ_AUT is Record of Sin).
+ */
+const learnedNames = new Map<string, string>();
+
+export function learnAreaNames(points: { level: string | null; area: string }[]): void {
+  const votes = new Map<string, Map<string, number>>();
+  for (const p of points) {
+    if (!p.level) continue;
+    const fam = zoneFamily(p.level);
+    const v = votes.get(fam) ?? new Map<string, number>();
+    v.set(p.area, (v.get(p.area) ?? 0) + 1);
+    votes.set(fam, v);
+  }
+  for (const [fam, v] of votes) {
+    if (AREA_NAMES[fam]) continue; // the fixed names cover the main areas
+    // A sublevel can hold landmarks of two areas (740_SZ_Prison: Underworld and
+    // Forgotten Dungeon); name both, most landmarks first.
+    learnedNames.set(fam, [...v].sort((a, b) => b[1] - a[1]).map(([area]) => area).join(" / "));
+  }
+}
+
 /** HUD label for a zone family, e.g. "Ancient World (AUT)". */
 export function areaLabel(family: string): string {
-  const name = AREA_NAMES[family];
+  const name = AREA_NAMES[family] ?? learnedNames.get(family);
   return name ? `${name} (${family})` : family;
 }

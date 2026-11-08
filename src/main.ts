@@ -40,7 +40,7 @@ import { loadSettings, saveSettings } from "./viewer/settings.ts";
 import { createWorkerApi } from "./viewer/rpc.ts";
 import { applyGameTheme } from "./viewer/theme.ts";
 import { World } from "./viewer/world.ts";
-import { ALL_LEVELS, areaLabel, PHASE1_LEVELS } from "./viewer/zones.ts";
+import { ALL_LEVELS, areaLabel, learnAreaNames, PHASE1_LEVELS } from "./viewer/zones.ts";
 import "@fontsource/arvo/400.css";
 import "@fontsource/arvo/400-italic.css";
 import "./style.css";
@@ -134,6 +134,7 @@ async function start(sceneData: Awaited<ReturnType<typeof api.scene>>) {
   const world = new World(api, renderer);
   world.tint = settings.tint;
   scene.add(world.root);
+  learnAreaNames(sceneData.locations.flatMap((g) => g.points.map((p) => ({ level: p.level, area: g.area }))));
   const markers = createMarkers(sceneData.locations);
   scene.add(markers);
   const collectibles = new CollectibleLayer(api, sceneData.collectibles);
