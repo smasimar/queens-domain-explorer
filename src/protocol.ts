@@ -45,6 +45,8 @@ export interface CollectiblePoint {
   /** Secret doors opened by switches: save GUIDs per switch, and how many must be set. */
   activators?: string[][];
   required?: number;
+  /** Unique enemies: the EnemyData path; killed when the save's KilledEnemyCounts has it. */
+  enemy?: string;
 }
 
 export interface LocationGroup {

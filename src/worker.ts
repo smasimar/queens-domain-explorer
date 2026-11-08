@@ -29,7 +29,7 @@ import { readProps } from "./ue/properties.ts";
 import { IDENTITY, toThreeMatrix, ueToThreePoint, UNIT, type Xform } from "./ue/transform.ts";
 
 /** Bump when parser output changes, to invalidate caches. */
-const CACHE_VERSION = "v10";
+const CACHE_VERSION = "v11";
 const PERSISTENT = "/Game/RuinsLevel/Maps/Ruins_Level_00";
 const STRING_TABLE = "/Game/StringTables/ImportedStringTable";
 const ALTAR_MESH = {
@@ -109,10 +109,38 @@ async function buildCollectibles(placed: PlacedCollectible[], strings: Map<strin
     }
     return p;
   };
+  // Unique enemies: bestiary-counted types with one spawner in the world and no
+  // boss health bar. The "A Lifetime's Work" bestiary needs one kill of each type.
+  const spawners = new Map<string, number>();
+  for (const c of placed) if (c.enemy) spawners.set(c.enemy, (spawners.get(c.enemy) ?? 0) + 1);
+  const enemies = new Map<string, Promise<{ name: string; unique: boolean }>>();
+  const enemyData = (path: string) => {
+    let p = enemies.get(path);
+    if (!p) {
+      p = (async () => {
+        const pkg = await loadPkg(path).catch(() => null);
+        const e = pkg?.exports.find((x) => pkg.exportClass(x) === "EnemyData_C");
+        if (!pkg || !e) return { name: path, unique: false };
+        const p = readProps(pkg.exportReader(e), pkg);
+        const n = p.Name as { key?: string } | null;
+        const counted = p.DoNotCountForBestiaryTotal !== true && p.bDoNotAllowInBestiary !== true;
+        return {
+          name: n?.key ? strings.get(n.key) ?? n.key : path.split(".")[1],
+          unique: counted && p.Boss !== true && spawners.get(path) === 1,
+        };
+      })();
+      enemies.set(path, p);
+    }
+    return p;
+  };
   const out: CollectiblePoint[] = [];
   for (const c of placed) {
+    const foe = c.enemy ? await enemyData(c.enemy) : null;
+    if (foe && !foe.unique) continue;
     const data = c.item ? await itemData(c.item) : null;
-    const name = c.kind === "chest"
+    const name = foe
+      ? foe.name
+      : c.kind === "chest"
       ? "Chest"
       : c.kind === "door"
       ? "Secret door"
@@ -128,12 +156,14 @@ async function buildCollectibles(placed: PlacedCollectible[], strings: Map<strin
       count: c.count,
       position: ueToThreePoint(c.xform.t),
       level: c.level,
-      guids: c.guids,
+      // Spawner GUIDs are in EnemySaveStates, not SavableActorStates; kills are tracked per type.
+      guids: foe ? [] : c.guids,
       noteKey: c.noteKey,
       item: c.kind === "pickup" ? c.item : null,
       hiddenBy: c.hiddenBy,
       icon: data?.icon ?? null,
       ...(c.activators.length ? { activators: c.activators, required: c.required } : {}),
+      ...(c.enemy ? { enemy: c.enemy } : {}),
     });
   }
   return out;

@@ -15,7 +15,8 @@ export type CollectibleCategory =
   | "treasure"
   | "notes"
   | "chests"
-  | "doors";
+  | "doors"
+  | "enemies";
 
 /** One placed collectible, in UE world space. */
 export interface PlacedCollectible {
@@ -30,7 +31,9 @@ export interface PlacedCollectible {
   noteKey: string | null;
   /** Notes: the display title. */
   title: string | null;
-  kind: "pickup" | "note" | "chest" | "door";
+  kind: "pickup" | "note" | "chest" | "door" | "enemy";
+  /** Enemy spawners: the EnemyData asset path. */
+  enemy: string | null;
   /**
    * Doors opened by levers, runes or switches save no state of their own: one GUID
    * list per activator, and how many activators must be in the save.
@@ -47,11 +50,15 @@ export interface ClassInfo {
   /** ItemsToGrant merged up the class chain. */
   grants: Map<string, number>;
   configOverride: string | null;
+  /** EnemyData set on the class defaults (enemy spawners). */
+  enemyData: string | null;
 }
 
 export const PICKUP_BASE = "/Game/Blueprints/CoreItemPickupActor.CoreItemPickupActor_C";
 const NOTE_CLASS = /\/(Oldnotes_00_Inspect_BP|InspectText)\./;
 const CHEST_CLASS = /Chest/;
+/** Every placed enemy comes from a subclass of this spawner. */
+const SPAWNER_BASE = "/Game/Enemies/EnemySpawner.EnemySpawner_C";
 /** Secret walls; the "Concealed Passages" challenge counts the ones without Don'tCountForAchievement. */
 const DOOR_CLASS = "/Game/Blueprints/SecretWall.SecretWall_C";
 /** Properties that list the actors an activator reveals. */
@@ -99,7 +106,7 @@ export function classResolver(loadPkg: (path: string) => Promise<Package | null>
     let p = cache.get(path);
     if (p) return p;
     p = (async () => {
-      const info: ClassInfo = { chain: [path], grants: new Map(), configOverride: null };
+      const info: ClassInfo = { chain: [path], grants: new Map(), configOverride: null, enemyData: null };
       if (!path.startsWith("/Game/")) return info;
       const pkg = await loadPkg(path).catch(() => null);
       if (!pkg) return info;
@@ -112,6 +119,7 @@ export function classResolver(loadPkg: (path: string) => Promise<Package | null>
         info.chain.push(...sup.chain);
         info.grants = new Map(sup.grants);
         info.configOverride = sup.configOverride;
+        info.enemyData = sup.enemyData;
       }
       const cdo = pkg.exports.find((e) => e.objectName === "Default__" + clsName);
       if (cdo) {
@@ -119,6 +127,8 @@ export function classResolver(loadPkg: (path: string) => Promise<Package | null>
         info.grants = applyGrants(info.grants, props.ItemsToGrant);
         const co = ref(props.PickupConfigOverride);
         if (co < 0) info.configOverride = pkg.importPath(co);
+        const ed = ref(props.EnemyData);
+        if (ed < 0) info.enemyData = pkg.importPath(ed);
       }
       return info;
     })();
@@ -178,7 +188,8 @@ export async function parseLevelCollectibles(
     const isActivator = /Chest|Crate|Barrel|pot|SecretWall/i.test(cls);
     const info = isNote ? null : await classInfo(cls);
     const isPickup = !!info?.chain.includes(PICKUP_BASE);
-    if (!isNote && !isPickup && !isActivator) continue;
+    const isSpawner = !!info?.chain.includes(SPAWNER_BASE);
+    if (!isNote && !isPickup && !isActivator && !isSpawner) continue;
     const p = propsOf(i + 1);
     if (isActivator) {
       for (const name of ACTIVATOR_PROPS) {
@@ -188,7 +199,13 @@ export async function parseLevelCollectibles(
       }
     }
     if (isDoor && p["Don'tCountForAchievement"] === true) continue;
-    if (!isNote && !isPickup && !isChest && !isDoor) continue;
+    let enemy: string | null = null;
+    if (isSpawner) {
+      const ed = ref(p.EnemyData);
+      enemy = ed < 0 ? pkg.importPath(ed) : info?.enemyData ?? null;
+      if (!enemy) continue;
+    }
+    if (!isNote && !isPickup && !isChest && !isDoor && !isSpawner) continue;
     const root = ref(p.RootComponent);
     if (root <= 0) continue;
     const guids = guidsOf(p);
@@ -211,7 +228,8 @@ export async function parseLevelCollectibles(
       guids,
       noteKey: typeof p.ImportKey === "string" && p.ImportKey ? p.ImportKey : null,
       title: title ? title.key ?? title.text ?? null : null,
-      kind: isNote ? "note" : isPickup ? "pickup" : isDoor ? "door" : "chest",
+      kind: isNote ? "note" : isPickup ? "pickup" : isDoor ? "door" : isSpawner ? "enemy" : "chest",
+      enemy,
       hiddenBy: null,
       activators: [],
       required: isDoor && typeof p.ActivationCountRequirement === "number" ? p.ActivationCountRequirement : 1,
@@ -234,6 +252,7 @@ export async function parseLevelCollectibles(
     }
   }
   for (const c of out) {
+    if (c.kind === "enemy") continue;
     if (c.kind === "door") {
       c.hiddenBy = c.activators.length ? (c.required > 1 ? `opens with ${c.required} switches` : "opens with a switch") : null;
       continue;
@@ -255,6 +274,7 @@ export function categorize(
   if (kind === "note") return "notes";
   if (kind === "chest") return "chests";
   if (kind === "door") return "doors";
+  if (kind === "enemy") return "enemies";
   const n = Number(/NewEnumerator(\d+)/.exec(itemCategory ?? "")?.[1] ?? -1);
   if (/\/KeyItems\/Egg\//.test(cls)) return "eggs";
   if (/\/SecretRelicKey\//.test(cls)) return "skulls";

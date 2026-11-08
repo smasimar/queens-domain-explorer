@@ -38,10 +38,12 @@ The menu (left) has two tabs:
 - **Markers** has display toggles (zone tint, draw range), landmarks (Wing Altars,
   Crystal Monuments) and a toggle for each collectible category (Main Weapons, Throwing
   Weapons, accessories, Orbewa Eggs, Strange Skulls, keys, Meals and other upgrades, treasure,
-  chests, secret doors, notes). Point the crosshair at a marker to
+  chests, secret doors, unique enemies, notes). Point the crosshair at a marker to
   see its name and where it hides (in chest, in crate, behind secret wall). Crystal
   Monuments show their area and name. Secret doors are the 89 that the
-  "Concealed Passages" challenge counts.
+  "Concealed Passages" challenge counts. Unique enemies are the 46 enemy types that
+  have one spawn point in the world, no boss health bar, and count for Wourha's
+  bestiary ("A Lifetime's Work"). With a save, a type you have killed once is greyed out.
 
 The compass (top right) is the game's own compass sphere.
 

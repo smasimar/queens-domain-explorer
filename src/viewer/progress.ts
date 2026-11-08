@@ -8,6 +8,7 @@ export class Progress {
   private teleporters: Set<string>;
   private savePoints: Set<string>;
   private items: Set<string>;
+  private kills: Set<string>;
 
   constructor(readonly save: SaveProgress) {
     this.states = new Set(save.actorStates);
@@ -15,10 +16,12 @@ export class Progress {
     this.teleporters = new Set(save.unlockedTeleporters);
     this.savePoints = new Set(save.savePointsVisited);
     this.items = new Set(save.itemsOwned ?? []);
+    this.kills = new Set(save.enemiesKilled ?? []);
   }
 
   /** true = collected/opened/read, false = not yet, null = the save cannot tell. */
   collected(p: CollectiblePoint): boolean | null {
+    if (p.enemy) return this.kills.has(p.enemy);
     if (p.category === "notes") return p.noteKey ? this.flags.has(`ReadNote_${p.noteKey}`) : null;
     // A few unique pickups have no save GUID: the save only records the item
     // (owned, used up or sold). Each is the only placement of its item.

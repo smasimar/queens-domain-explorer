@@ -196,6 +196,8 @@ export interface SaveProgress {
    * shop sales, equipment and weapon levels.
    */
   itemsOwned: string[];
+  /** EnemyData paths with at least one kill (KilledEnemyCounts). */
+  enemiesKilled: string[];
 }
 
 const strings = (v: SaveValue) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
@@ -217,5 +219,10 @@ export function readSaveProgress(bytes: Uint8Array): SaveProgress {
       ...mapKeys(p.Equipment),
       ...mapKeys(p.WeaponLevels),
     ]),
+    enemiesKilled: strings(
+      (Array.isArray(p.KilledEnemyCounts) ? p.KilledEnemyCounts : [])
+        .filter((e) => Number((e as [SaveValue, SaveValue])[1]) > 0)
+        .map((e) => (e as [SaveValue, SaveValue])[0]),
+    ),
   };
 }

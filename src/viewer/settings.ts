@@ -3,24 +3,27 @@ import type { CollectibleCategory } from "../protocol.ts";
 export interface CategoryInfo {
   id: CollectibleCategory;
   label: string;
+  /** Singular name for hover text. */
+  one: string;
   color: string;
   on: boolean;
 }
 
 /** Collectible categories in menu order, with their ring colour and default visibility. */
 export const CATEGORIES: CategoryInfo[] = [
-  { id: "weapons", label: "Main Weapons", color: "#f0c850", on: true },
-  { id: "subweapons", label: "Throwing Weapons", color: "#f08a4b", on: true },
-  { id: "accessories", label: "Accessories", color: "#c98cf0", on: true },
-  { id: "eggs", label: "Orbewa Eggs", color: "#f4f1de", on: true },
-  { id: "skulls", label: "Strange Skulls", color: "#9fb4bd", on: true },
-  { id: "keys", label: "Keys", color: "#ffe066", on: true },
-  { id: "health", label: "Meals", color: "#ff6b6b", on: true },
-  { id: "upgrades", label: "Other upgrades", color: "#4fd8e8", on: true },
-  { id: "treasure", label: "Treasure", color: "#f0a020", on: true },
-  { id: "chests", label: "Chests", color: "#c08850", on: true },
-  { id: "doors", label: "Secret doors", color: "#7fa8ff", on: true },
-  { id: "notes", label: "Notes", color: "#d8c8a0", on: false },
+  { id: "weapons", label: "Main Weapons", one: "Main Weapon", color: "#f0c850", on: true },
+  { id: "subweapons", label: "Throwing Weapons", one: "Throwing Weapon", color: "#f08a4b", on: true },
+  { id: "accessories", label: "Accessories", one: "Accessory", color: "#c98cf0", on: true },
+  { id: "eggs", label: "Orbewa Eggs", one: "Orbewa Egg", color: "#f4f1de", on: true },
+  { id: "skulls", label: "Strange Skulls", one: "Strange Skull", color: "#9fb4bd", on: true },
+  { id: "keys", label: "Keys", one: "Key", color: "#ffe066", on: true },
+  { id: "health", label: "Meals", one: "Meal", color: "#ff6b6b", on: true },
+  { id: "upgrades", label: "Other upgrades", one: "Upgrade", color: "#4fd8e8", on: true },
+  { id: "treasure", label: "Treasure", one: "Treasure", color: "#f0a020", on: true },
+  { id: "chests", label: "Chests", one: "Chest", color: "#c08850", on: true },
+  { id: "doors", label: "Secret doors", one: "Secret door", color: "#7fa8ff", on: true },
+  { id: "enemies", label: "Unique enemies", one: "Unique enemy", color: "#e0485a", on: true },
+  { id: "notes", label: "Notes", one: "Note", color: "#d8c8a0", on: false },
 ];
 
 export const CATEGORY_BY_ID = new Map(CATEGORIES.map((c) => [c.id, c]));

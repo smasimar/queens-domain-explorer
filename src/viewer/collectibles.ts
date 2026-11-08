@@ -19,6 +19,32 @@ interface Skin {
   glyph: ((g: CanvasRenderingContext2D, c: number, color: string) => void) | null;
 }
 
+/** Unique enemy: two crossed swords, tips up, crossing at the centre. */
+function crossedSwords(g: CanvasRenderingContext2D, c: number, color: string): void {
+  g.lineCap = "round";
+  for (const dir of [1, -1]) {
+    g.save();
+    g.translate(c, c);
+    g.rotate((dir * Math.PI) / 4);
+    g.fillStyle = "#fff";
+    g.beginPath(); // blade with a pointed tip
+    g.moveTo(0, -19);
+    g.lineTo(2.5, -15);
+    g.lineTo(2.5, 7);
+    g.lineTo(-2.5, 7);
+    g.lineTo(-2.5, -15);
+    g.closePath();
+    g.fill();
+    g.fillStyle = color;
+    g.fillRect(-6, 7, 12, 3); // guard
+    g.fillRect(-1.5, 10, 3, 6); // grip
+    g.beginPath(); // pommel
+    g.arc(0, 17.5, 2.5, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+  }
+}
+
 /** Secret door: a brick wall with an arrow showing it slides open. */
 function slidingWall(g: CanvasRenderingContext2D, c: number, color: string): void {
   const bw = 8, bh = 6, gap = 1.5;
@@ -160,7 +186,7 @@ export class CollectibleLayer {
     canvas.width = canvas.height = SIZE;
     const texture = new CanvasTexture(canvas);
     const material = new SpriteMaterial({ map: texture, depthTest: false, sizeAttenuation: false, transparent: true });
-    s = { canvas, texture, material, color: CATEGORY_BY_ID.get(p.category)?.color ?? "#fff", grey, icon: null, glyph: p.category === "doors" ? slidingWall : null };
+    s = { canvas, texture, material, color: CATEGORY_BY_ID.get(p.category)?.color ?? "#fff", grey, icon: null, glyph: p.category === "doors" ? slidingWall : p.category === "enemies" ? crossedSwords : null };
     this.skins.set(key, s);
     draw(s);
     if (p.icon && !s.glyph) {
@@ -252,17 +278,18 @@ export function pickNearCentre(
   return best;
 }
 
-/** HUD text for a hovered collectible. */
+/** HUD text for a hovered collectible, one part per line. */
 export function describe(s: Sprite, hasSave: boolean): string {
   const p = s.userData.point as CollectiblePoint;
   const opens = p.category === "chests" || p.category === "doors";
+  const foe = p.category === "enemies";
   const parts = [p.count > 1 ? `${p.name} ×${p.count}` : p.name];
   // "Chest" and "Secret door" already name their category.
-  if (!opens) parts.push(CATEGORY_BY_ID.get(p.category)?.label ?? p.category);
+  if (!opens) parts.push(CATEGORY_BY_ID.get(p.category)?.one ?? p.category);
   if (p.hiddenBy) parts.push(p.hiddenBy);
   if (hasSave) {
     const c = s.userData.collected as boolean | null;
-    parts.push(c === null ? "save state unknown" : opens ? (c ? "opened" : "not opened") : c ? "collected" : "not collected");
+    parts.push(c === null ? "save state unknown" : opens ? (c ? "opened" : "not opened") : foe ? (c ? "killed" : "not killed") : c ? "collected" : "not collected");
   }
-  return parts.join(" · ");
+  return parts.join("\n");
 }
