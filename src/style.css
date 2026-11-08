@@ -89,7 +89,10 @@ canvas { display: block; }
 }
 button { font: inherit; cursor: pointer; }
 
-#hud { position: fixed; inset: 0; pointer-events: none; font-size: 13px; text-shadow: 0 1px 2px #000; }
+#hud {
+  position: fixed; inset: 0; pointer-events: none; font-size: 13px;
+  text-shadow: 0 1px 2px #000, 0 0 4px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.6);
+}
 #hud > div { position: absolute; }
 #help { top: 10px; left: 50%; transform: translateX(-50%); color: #ddd; font-size: 12px; white-space: nowrap; opacity: 0.85; }
 #compass {
@@ -97,8 +100,9 @@ button { font: inherit; cursor: pointer; }
   background: linear-gradient(90deg, transparent, rgba(0,0,0,0.35) 20%, rgba(0,0,0,0.35) 80%, transparent);
   border-radius: 4px;
 }
-#zone { bottom: 34px; left: 12px; font-size: 16px; font-weight: 600; }
-#info { bottom: 12px; left: 12px; color: #ccc; }
+#zone { bottom: 12px; left: 12px; font-size: 16px; font-weight: 600; }
+/* Speed: centred under the compass (92 px wide, 14 px from the top-right corner). */
+#info { top: 112px; right: 60px; transform: translateX(50%); color: #ddd; white-space: nowrap; }
 #progress { top: 10px; right: 12px; color: var(--accent); }
 #crosshair {
   left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px;
@@ -130,9 +134,8 @@ button.loc.save i { background: #7be07b; border-radius: 50%; }
 button.loc.fasttravel span { font-weight: 600; }
 button.loc.approx { opacity: 0.6; }
 #zone { left: 262px; }
-#info { left: 262px; }
-#progress { right: 12px; top: 44px; }
-body:has(#menu.collapsed) #zone, body:has(#menu.collapsed) #info { left: 12px; }
+#progress { right: 12px; top: 136px; }
+body:has(#menu.collapsed) #zone { left: 12px; }
 
 /* ---- In-game look (textures + font read from the user's pak at runtime) ---- */
 body.qd-font #menu, body.qd-font #hud { font-family: "QD Game", Georgia, serif; }
@@ -182,8 +185,82 @@ body.qd-theme button.loc.fasttravel i {
 body.qd-theme button.loc.save i {
   background: none; border: 2px solid #f2eee2; border-radius: 50%; width: 9px; height: 9px; box-shadow: 0 1px 1px #000;
 }
-body.qd-theme #zone, body.qd-theme #info { left: 312px; }
-body.qd-theme:has(#menu.collapsed) #zone, body.qd-theme:has(#menu.collapsed) #info { left: 12px; }
+body.qd-theme #zone { left: 312px; }
+body.qd-theme:has(#menu.collapsed) #zone { left: 12px; }
 body.qd-font #zone { font-size: 18px; font-weight: 400; }
 /* Center the help line in the 3D view, not under the menu. */
 body.qd-theme:not(:has(#menu.collapsed)) #help { left: calc(50% + 150px); max-width: calc(100vw - 440px); overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- Menu tabs + Markers tab ---- */
+#hover {
+  left: 50%; top: calc(50% + 14px); transform: translateX(-50%); white-space: nowrap;
+  font-size: 15px; color: #f2eee2; text-shadow: 0 1px 2px #000, 0 0 6px #000;
+}
+.menu-tabs { display: flex; gap: 4px; }
+.menu-tab {
+  background: transparent; border: 0; color: var(--muted); padding: 4px 8px; border-radius: 4px; font-weight: 600;
+}
+.menu-tab.active { color: var(--fg); background: rgba(255,255,255,0.1); }
+.menu-list[hidden] { display: none; }
+.menu-list.markers section { margin-bottom: 10px; }
+button.opt, label.opt {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  background: transparent; border: 0; color: var(--fg); padding: 5px 8px; border-radius: 5px; font-size: 13px;
+}
+button.opt:hover, button.opt.active { background: rgba(255,255,255,0.08); }
+.opt span { flex: 1; min-width: 0; }
+.opt em { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
+.opt small { display: block; font-size: 11px; color: var(--muted); }
+.opt kbd { font-size: 10px; }
+button.opt.toggle i {
+  width: 10px; height: 10px; flex: none; transform: rotate(45deg);
+  border: 2px solid var(--c, #cfd8c0); background: transparent;
+}
+button.opt.toggle.on i { background: var(--c, #cfd8c0); }
+button.opt.toggle:not(.on) span { opacity: 0.6; }
+button.opt.slot i { width: 8px; height: 8px; flex: none; border-radius: 50%; border: 2px solid #cfd8c0; }
+button.opt.slot.active i { background: #cfd8c0; }
+button.opt.action span { padding-left: 18px; }
+button.opt.action.primary span { font-weight: 600; }
+label.opt.range input { flex: 1; min-width: 0; accent-color: #7da34a; }
+label.opt.range span { flex: none; }
+.menu-note { margin: 6px 8px; font-size: 12px; color: var(--muted); line-height: 1.4; }
+.menu-note code { word-break: break-all; }
+.menu-note.error { color: #ff9a8a; }
+.menu-empty { margin: 12px 8px; color: var(--muted); }
+
+body.qd-theme .menu-tabs { gap: 2px; }
+body.qd-theme .menu-tab {
+  font-family: inherit; font-size: 19px; font-weight: 400; color: rgba(242,238,226,0.6); padding: 3px 8px; border-radius: 0;
+  text-shadow: 0 2px 2px rgba(0,0,0,0.85);
+}
+body.qd-theme .menu-tab.active {
+  color: #f2eee2; background: rgba(0,0,0,0.22);
+  box-shadow: inset 1px 1px 0 rgba(0,0,0,0.45), inset -1px -1px 0 rgba(255,255,255,0.18);
+}
+body.qd-theme .menu-list.markers section { margin: 0; padding: 6px 0 8px; }
+body.qd-theme .menu-list.markers section + section { border-top: 2px solid rgba(0,0,0,0.55); box-shadow: inset 0 1px 0 rgba(255,255,255,0.16); }
+body.qd-theme button.opt, body.qd-theme label.opt {
+  font-family: inherit; font-size: 16px; color: #f2eee2; padding: 5px 10px 5px 12px; border-radius: 0;
+  text-shadow: 0 2px 2px rgba(0,0,0,0.9);
+}
+body.qd-theme button.opt:hover, body.qd-theme button.opt.active {
+  background: linear-gradient(#6f9440, #5b7f33);
+  box-shadow: inset 1px 1px 0 rgba(255,255,255,0.25), inset -1px -1px 0 rgba(0,0,0,0.45);
+}
+body.qd-theme .opt em, body.qd-theme .opt small { color: rgba(242,238,226,0.75); }
+body.qd-theme .opt small { font-size: 13px; }
+body.qd-theme button.opt.toggle i { box-shadow: 0 1px 1px #000; }
+body.qd-theme .opt kbd { color: #f2eee2; border-color: rgba(0,0,0,0.5); background: rgba(0,0,0,0.25); }
+body.qd-theme .menu-note { color: rgba(242,238,226,0.8); font-size: 14px; text-shadow: 0 1px 2px #000; }
+body.qd-theme .menu-note.error { color: #ffb4a6; }
+body.qd-theme .menu-empty { color: #f2eee2; }
+/* Baseline alignment keeps the small toggle on the heading's text line. */
+.sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.sec-head h3 { flex: 1; }
+.sec-head button.opt.inline { line-height: 1; }
+button.opt.inline { width: auto; flex: none; padding: 2px 6px; font-size: 11px; gap: 6px; }
+button.opt.inline span { flex: none; }
+/* Lift the diamond to the optical middle of the text (between baseline and cap height). */
+button.opt.inline i { width: 8px; height: 8px; transform: translateY(-0.15em) rotate(45deg); }
+body.qd-theme button.opt.inline { font-size: 13px; padding: 2px 8px; }

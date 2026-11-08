@@ -1,6 +1,8 @@
 import { CanvasTexture, Group, type PerspectiveCamera, Sprite, SpriteMaterial, Vector3 } from "three";
 import type { LocationGroup, LocationPoint } from "../protocol.ts";
 import type { NoclipControls } from "./controls.ts";
+import type { Progress } from "./progress.ts";
+import type { Settings } from "./settings.ts";
 
 const COLORS = { fasttravel: "#5fb8ff", save: "#7be07b" };
 
@@ -45,10 +47,31 @@ export function createMarkers(groups: LocationGroup[]): Group {
       s.position.set(p.position[0], p.position[1] + 3.2, p.position[2]);
       s.scale.setScalar(0.028);
       s.renderOrder = 10;
+      s.userData.point = p;
       root.add(s);
     }
   }
   return root;
+}
+
+/** Whether a travel point shows (in 3D and in the list) for these settings and save. */
+export function locationVisible(p: LocationPoint, settings: Settings, progress: Progress | null): boolean {
+  return settings.showLocked || !progress || progress.unlocked(p);
+}
+
+/** Per-frame marker visibility: kind toggle, lock state and draw range. */
+export function updateMarkers(
+  markers: Group,
+  camera: PerspectiveCamera,
+  settings: Settings,
+  progress: Progress | null,
+): void {
+  const r2 = settings.range * settings.range;
+  for (const s of markers.children) {
+    const p = s.userData.point as LocationPoint;
+    const on = p.kind === "fasttravel" ? settings.teleporters : settings.saves;
+    s.visible = on && locationVisible(p, settings, progress) && s.position.distanceToSquared(camera.position) < r2;
+  }
 }
 
 /** Move the camera to view an altar from in front of it. */
@@ -70,25 +93,22 @@ export function flyTo(p: LocationPoint, camera: PerspectiveCamera, controls: Noc
   controls.setYawPitch(Math.atan2(-d.x, -d.z), Math.asin(Math.max(-1, Math.min(1, d.y))));
 }
 
-/** Left-side teleport menu, grouped by area: fast travel first, then save altars. */
-export function createLocationMenu(
-  el: HTMLElement,
+/** Fast Travel tab: grouped by area, fast travel first, then save altars. */
+export function renderLocationList(
+  list: HTMLElement,
   groups: LocationGroup[],
   onPick: (p: LocationPoint) => void,
+  visible: (p: LocationPoint) => boolean,
 ): void {
-  el.innerHTML = "";
-  const head = document.createElement("div");
-  head.className = "menu-head";
-  head.innerHTML = `<span>Fast Travel</span><kbd>M</kbd>`;
-  el.appendChild(head);
-  const list = document.createElement("div");
-  list.className = "menu-list";
+  list.innerHTML = "";
   for (const g of groups) {
+    const points = g.points.filter(visible);
+    if (!points.length) continue;
     const sec = document.createElement("section");
     const h = document.createElement("h3");
     h.textContent = g.area;
     sec.appendChild(h);
-    for (const p of g.points) {
+    for (const p of points) {
       const b = document.createElement("button");
       b.className = `loc ${p.kind}`;
       b.title = p.placed ? `${p.level}` : "Altar's sublevel not loaded: shows the travel destination";
@@ -96,7 +116,7 @@ export function createLocationMenu(
       b.querySelector("span")!.textContent = p.kind === "fasttravel" ? "Fast travel" : p.name;
       if (!p.placed) b.classList.add("approx");
       b.onclick = () => {
-        el.querySelector("button.loc.active")?.classList.remove("active");
+        list.querySelector("button.loc.active")?.classList.remove("active");
         b.classList.add("active");
         onPick(p);
       };
@@ -104,5 +124,5 @@ export function createLocationMenu(
     }
     list.appendChild(sec);
   }
-  el.appendChild(list);
+  if (!list.children.length) list.innerHTML = `<p class="menu-empty">No unlocked travel points in this save.</p>`;
 }

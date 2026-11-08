@@ -1,4 +1,5 @@
 import {
+  Box3,
   BufferAttribute,
   BufferGeometry,
   Color,
@@ -20,6 +21,7 @@ import {
   RED_RGTC1_Format,
   SRGBColorSpace,
   type Texture,
+  Vector3,
   type WebGLRenderer,
 } from "three";
 import type { GeometryData, SceneData, TextureData, WorkerApi } from "../protocol.ts";
@@ -46,6 +48,39 @@ export class World {
 
   constructor(private readonly api: WorkerApi, private readonly renderer: WebGLRenderer) {
     this.root.matrixAutoUpdate = false;
+  }
+
+  /**
+   * The shared shell sublevel (070_UpperShell) holds the outer hulls of many areas
+   * (Tower of Knowledge, Mausoleum sections, secret zones...). Give each hull the
+   * family of the area geometry it mostly encloses, for the zone label and tint.
+   */
+  async assignShellFamilies(): Promise<void> {
+    this.root.updateMatrixWorld(true);
+    const box = new Box3();
+    const shells: Mesh[] = [];
+    const others: { c: Vector3; family: string; secret: boolean }[] = [];
+    for (const o of this.root.children as Mesh[]) {
+      const f = o.userData.family as string;
+      if (f === "UpperShell") shells.push(o);
+      else if (f !== "Shared" && f !== "Ocean") {
+        const n = Number(/^(\d{3})_/.exec(o.userData.level)?.[1] ?? -1);
+        others.push({ c: box.setFromObject(o).getCenter(new Vector3()), family: f, secret: n >= 700 && n < 800 });
+      }
+    }
+    for (const s of shells) {
+      box.setFromObject(s);
+      const inside = others.filter((o) => box.containsPoint(o.c));
+      // Secret-zone hulls (SZ_*) vote among the 7xx sublevels, the rest among the main areas.
+      const secret = /^SZ_/.test(s.userData.mesh);
+      const pool = inside.filter((o) => o.secret === secret);
+      const votes = new Map<string, number>();
+      for (const o of pool.length ? pool : inside) votes.set(o.family, (votes.get(o.family) ?? 0) + 1);
+      const best = [...votes].sort((a, b) => b[1] - a[1])[0];
+      if (!best) continue;
+      s.userData.family = best[0];
+      s.material = await Promise.all((s.userData.matPaths as (string | null)[]).map((m) => this.material(m, best[0])));
+    }
   }
 
   async load(scene: SceneData, onProgress: (p: LoadProgress) => void): Promise<void> {
@@ -82,14 +117,13 @@ export class World {
     const geo = this.buildGeometry(path, geoData);
     for (const a of actors) {
       const family = zoneFamily(a.level);
-      const mats = await Promise.all(
-        geoData.materials.map((m, i) => this.material(a.overrides[i] ?? m, family)),
-      );
+      const matPaths = geoData.materials.map((m, i) => a.overrides[i] ?? m);
+      const mats = await Promise.all(matPaths.map((m) => this.material(m, family)));
       const mesh = new Mesh(geo, mats);
       mesh.matrixAutoUpdate = false;
       mesh.matrix.copy(new Matrix4().fromArray(a.matrix));
       mesh.matrixWorldNeedsUpdate = true;
-      mesh.userData = { level: a.level, family, mesh: path.split(".").pop() };
+      mesh.userData = { level: a.level, family, mesh: path.split(".").pop(), matPaths };
       this.root.add(mesh);
     }
   }

@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 import { AssetCache, pack, unpack, writeLastNamespace } from "./cache.ts";
 import type {
+  CollectiblePoint,
   GeometryData,
   LocationGroup,
   LocationPoint,
@@ -12,6 +13,7 @@ import type {
   UiImage,
   WorkerApi,
 } from "./protocol.ts";
+import { categorize, classResolver, type PlacedCollectible, parseLevelCollectibles } from "./ue/collectibles.ts";
 import { decodeToRGBA } from "./ue/decode.ts";
 import { gamePathToPak, loadPackage } from "./ue/assets.ts";
 import { parseLevelAltars, parseLevelGeometry, parsePersistentLevel, type PlacedAltar } from "./ue/level.ts";
@@ -23,10 +25,11 @@ import { PakFile } from "./ue/pak.ts";
 import { BlobSource, HttpRangeSource } from "./ue/source.ts";
 import { parseStaticMesh } from "./ue/staticmesh.ts";
 import { parseTexture2D } from "./ue/texture.ts";
-import { toThreeMatrix, ueToThreePoint, UNIT, type Xform } from "./ue/transform.ts";
+import { readProps } from "./ue/properties.ts";
+import { IDENTITY, toThreeMatrix, ueToThreePoint, UNIT, type Xform } from "./ue/transform.ts";
 
 /** Bump when parser output changes, to invalidate caches. */
-const CACHE_VERSION = "v5";
+const CACHE_VERSION = "v8";
 const PERSISTENT = "/Game/RuinsLevel/Maps/Ruins_Level_00";
 const STRING_TABLE = "/Game/StringTables/ImportedStringTable";
 const ALTAR_MESH = {
@@ -70,10 +73,70 @@ function threeForward(x: Xform): [number, number, number] {
 }
 
 /** Group save / fast-travel points by area: fast travel first, then saves in game order. */
+async function loadStrings(): Promise<Map<string, string>> {
+  const stPkg = await loadPkg(STRING_TABLE);
+  return stPkg ? parseStringTable(stPkg) : new Map<string, string>();
+}
+
+/** ItemIcon is an object import (or a soft path in some assets). */
+function iconPath(pkg: Package, v: unknown): string | null {
+  if (typeof v === "string") return v && v !== "None" ? v : null;
+  const r = v && typeof v === "object" && "ref" in v ? (v as { ref: number }).ref : 0;
+  return r < 0 ? pkg.importPath(r) : null;
+}
+
+/** Resolve item names, categories and icons for placed collectibles. */
+async function buildCollectibles(placed: PlacedCollectible[], strings: Map<string, string>): Promise<CollectiblePoint[]> {
+  const items = new Map<string, Promise<{ name: string; category: string | null; icon: string | null }>>();
+  const itemData = (path: string) => {
+    let p = items.get(path);
+    if (!p) {
+      p = (async () => {
+        const pkg = await loadPkg(path).catch(() => null);
+        const objName = path.split(".")[1];
+        const e = pkg?.exports.find((x) => x.objectName === objName) ?? pkg?.exports[0];
+        if (!pkg || !e) return { name: objName ?? path, category: null, icon: null };
+        const p = readProps(pkg.exportReader(e), pkg);
+        const n = p.Name as { key?: string; text?: string } | string | null;
+        const name = typeof n === "string" ? n : n?.key ? strings.get(n.key) ?? n.key : n?.text ?? objName;
+        return {
+          name,
+          category: typeof p.Category === "string" ? p.Category : null,
+          icon: iconPath(pkg, p.ItemIcon),
+        };
+      })();
+      items.set(path, p);
+    }
+    return p;
+  };
+  const out: CollectiblePoint[] = [];
+  for (const c of placed) {
+    const data = c.item ? await itemData(c.item) : null;
+    const name = c.kind === "chest"
+      ? "Chest"
+      : c.kind === "note"
+      ? (c.title ? strings.get(c.title) ?? c.title : "Note")
+      : data?.name ?? c.cls.split(".")[1];
+    out.push({
+      id: `${c.level}/${c.actor}`,
+      category: categorize(c.cls, data?.category ?? null, c.kind),
+      name,
+      count: c.count,
+      position: ueToThreePoint(c.xform.t),
+      level: c.level,
+      guids: c.guids,
+      noteKey: c.noteKey,
+      item: c.kind === "pickup" ? c.item : null,
+      hiddenBy: c.hiddenBy,
+      icon: data?.icon ?? null,
+    });
+  }
+  return out;
+}
+
 async function buildLocations(altars: { level: string; altar: PlacedAltar }[]): Promise<LocationGroup[]> {
   if (!pak) return [];
-  const stPkg = await loadPkg(STRING_TABLE);
-  const strings = stPkg ? parseStringTable(stPkg) : new Map<string, string>();
+  const strings = await loadStrings();
   const assets: LocationAsset[] = [];
   for (const path of pak.entries.keys()) {
     const m = /^QueensDomain\/Content\/Blueprints\/Areas\/[^/]+\/([^/]+)\.uasset$/.exec(path);
@@ -99,6 +162,7 @@ async function buildLocations(altars: { level: string; altar: PlacedAltar }[]): 
       forward: threeForward(x),
       placed: !!placed,
       level: placed?.level ?? null,
+      asset: a.asset,
       sort: a.sort,
     });
     groups.set(a.area, g);
@@ -113,16 +177,36 @@ async function buildLocations(altars: { level: string; altar: PlacedAltar }[]): 
     }));
 }
 
-async function uiImage(path: string): Promise<UiImage | null> {
+async function uiImage(path: string, maxSize = 4096): Promise<UiImage | null> {
   try {
     const pkg = await loadPkg(path);
     if (!pkg) return null;
-    const t = parseTexture2D(pkg, 4096);
+    const t = parseTexture2D(pkg, maxSize);
     const m = t.mips[0];
     return { width: m.width, height: m.height, rgba: new Uint8Array(decodeToRGBA(t.format, m.data, m.width, m.height).buffer) };
   } catch {
     return null;
   }
+}
+
+/** Box-filter an RGBA image down to at most `max` pixels on its long side. */
+function downscale(img: UiImage, max: number): UiImage {
+  const f = Math.ceil(Math.max(img.width, img.height) / max);
+  if (f <= 1) return img;
+  const w = Math.floor(img.width / f), h = Math.floor(img.height / f);
+  const out = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      for (let c = 0; c < 4; c++) {
+        let sum = 0;
+        for (let dy = 0; dy < f; dy++) {
+          for (let dx = 0; dx < f; dx++) sum += img.rgba[((y * f + dy) * img.width + x * f + dx) * 4 + c];
+        }
+        out[(y * w + x) * 4 + c] = sum / (f * f);
+      }
+    }
+  }
+  return { width: w, height: h, rgba: out };
 }
 
 async function rawFile(pakPath: string): Promise<Uint8Array | null> {
@@ -159,6 +243,8 @@ const api: WorkerApi = {
       const actors: SceneActor[] = [];
       const loaded: string[] = [];
       const altars: { level: string; altar: PlacedAltar }[] = [];
+      const placed: PlacedCollectible[] = [];
+      const classInfo = classResolver(loadPkg);
       for (const name of levels) {
         const sl = info.levels.find((l) => l.name === name);
         const pkg = await loadPkg(sl?.packagePath ?? `/Game/RuinsLevel/Maps/${name}`);
@@ -171,13 +257,19 @@ const api: WorkerApi = {
           altars.push({ level: name, altar });
           actors.push({ level: name, mesh: ALTAR_MESH[altar.kind], matrix: toThreeMatrix(altar.xform), overrides: [] });
         }
+        try {
+          placed.push(...await parseLevelCollectibles(pkg, name, sl?.xform ?? IDENTITY, classInfo));
+        } catch (e) {
+          console.warn(`collectibles in ${name} failed`, e);
+        }
         pkgCache.delete(gamePathToPak(sl?.packagePath ?? `/Game/RuinsLevel/Maps/${name}`)); // levels are large
       }
       const spawn = info.spawn
         ? { position: ueToThreePoint(info.spawn.location), yaw: info.spawn.yaw }
         : null;
       const locations = await buildLocations(altars);
-      return { levels: loaded, spawn, actors, locations } satisfies SceneData;
+      const collectibles = await buildCollectibles(placed, await loadStrings());
+      return { levels: loaded, spawn, actors, locations, collectibles } satisfies SceneData;
     });
   },
 
@@ -217,6 +309,13 @@ const api: WorkerApi = {
         dot: await uiImage("/Game/UI/UI_Style/EquippedDot"),
       },
     }) satisfies UiAssets);
+  },
+
+  icon(path) {
+    return cached(`icon:${path}`, async () => {
+      const img = (await uiImage(path, 128)) ?? (await uiImage(path, 2048));
+      return img && downscale(img, 128);
+    });
   },
 
   texture(path) {

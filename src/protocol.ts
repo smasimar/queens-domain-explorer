@@ -1,4 +1,6 @@
 /** Data shapes passed between the parser worker and the viewer (three.js space, metres). */
+import type { CollectibleCategory } from "./ue/collectibles.ts";
+export type { CollectibleCategory };
 
 export interface SceneActor {
   level: string;
@@ -17,6 +19,29 @@ export interface LocationPoint {
   forward: [number, number, number];
   placed: boolean;
   level: string | null;
+  /** Location data asset path; the save lists unlocked ones by this path. */
+  asset: string;
+}
+
+/** A placed collectible (pickup, lore note or chest). */
+export interface CollectiblePoint {
+  /** "<level>/<actor>", unique. */
+  id: string;
+  category: CollectibleCategory;
+  name: string;
+  count: number;
+  position: [number, number, number];
+  level: string;
+  /** Save IDs; collected when any is in the save's SavableActorStates. */
+  guids: string[];
+  /** Notes: read when the save has `ReadNote_<noteKey>`. */
+  noteKey: string | null;
+  /** Item data path (pickups). Used when the pickup has no save GUID. */
+  item: string | null;
+  /** e.g. "in chest", "behind secret wall". */
+  hiddenBy: string | null;
+  /** Item icon texture path. */
+  icon: string | null;
 }
 
 export interface LocationGroup {
@@ -29,6 +54,7 @@ export interface SceneData {
   spawn: { position: [number, number, number]; yaw: number } | null;
   actors: SceneActor[];
   locations: LocationGroup[];
+  collectibles: CollectiblePoint[];
 }
 
 export interface GeometryData {
@@ -82,4 +108,6 @@ export interface WorkerApi {
   material(path: string): Promise<MaterialData>;
   texture(path: string): Promise<TextureData>;
   uiAssets(): Promise<UiAssets>;
+  /** Small RGBA version of an item icon texture. */
+  icon(path: string): Promise<UiImage | null>;
 }

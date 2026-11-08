@@ -10,13 +10,25 @@ import {
   Raycaster,
   Scene,
   SRGBColorSpace,
-  Vector2,
+  Vector3,
   WebGLRenderer,
 } from "three";
 import { clearAllCaches, readLastNamespace } from "./cache.ts";
+import { CollectibleLayer, describe } from "./viewer/collectibles.ts";
 import { Compass3D } from "./viewer/compass.ts";
 import { NoclipControls } from "./viewer/controls.ts";
-import { createLocationMenu, createMarkers, flyTo } from "./viewer/locations.ts";
+import { createMarkers, flyTo, locationVisible, renderLocationList, updateMarkers } from "./viewer/locations.ts";
+import { createMenu, type MarkersModel, renderMarkersPanel } from "./viewer/menu.ts";
+import { Progress } from "./viewer/progress.ts";
+import {
+  forgetSave,
+  pickSaveFiles,
+  restoreSave,
+  type SaveSlot,
+  type SaveState,
+  savesFromFiles,
+} from "./viewer/savefolder.ts";
+import { loadSettings, saveSettings } from "./viewer/settings.ts";
 import { createWorkerApi } from "./viewer/rpc.ts";
 import { applyGameTheme } from "./viewer/theme.ts";
 import { World } from "./viewer/world.ts";
@@ -110,35 +122,112 @@ async function start(sceneData: Awaited<ReturnType<typeof api.scene>>) {
     controls.setYawPitch(-(sceneData.spawn.yaw * Math.PI / 180 + Math.PI / 2));
   }
 
+  const settings = loadSettings();
   const world = new World(api, renderer);
+  world.tint = settings.tint;
   scene.add(world.root);
   const markers = createMarkers(sceneData.locations);
   scene.add(markers);
+  const collectibles = new CollectibleLayer(api, sceneData.collectibles);
+  scene.add(collectibles.root);
   const compass = new Compass3D();
   world.standaloneMesh("/Game/UI/HUD/Compass/Compass_SM.Compass_SM")
     .then((m) => compass.setMesh(m))
     .catch((e) => console.warn("compass mesh failed", e));
   applyGameTheme(api);
+
+  // ---- menu: Fast Travel + Markers tabs ----
   const menu = $("menu");
-  createLocationMenu(menu, sceneData.locations, (p) => flyTo(p, camera, controls));
+  const tabs = createMenu(menu);
+  let progress: Progress | null = null;
+  const renderTravel = () =>
+    renderLocationList(
+      tabs.travel,
+      sceneData.locations,
+      (p) => flyTo(p, camera, controls),
+      (p) => locationVisible(p, settings, progress),
+    );
+  const model: MarkersModel = {
+    settings,
+    counts: () => collectibles.counts(),
+    save: { kind: "none" },
+    selected: null,
+    error: null,
+    busy: false,
+    onSettings: (rerender = true) => {
+      saveSettings(settings);
+      if (world.tint !== settings.tint) world.tint = settings.tint;
+      updateInfo();
+      if (!rerender) return;
+      renderTravel();
+      renderPanel();
+    },
+    onPickFolder: () => loadSave(pickSaveFiles),
+    onForget: async () => {
+      await forgetSave();
+      setSave({ kind: "none" });
+    },
+    onSelect: (slot) => useSlot(slot),
+  };
+  const renderPanel = () => renderMarkersPanel(tabs.markers, model);
+  const useSlot = (slot: SaveSlot | null) => {
+    model.selected = slot;
+    progress = slot ? new Progress(slot.progress) : null;
+    collectibles.setProgress(progress);
+    renderTravel();
+    renderPanel();
+  };
+  const setSave = (state: SaveState) => {
+    model.save = state;
+    model.busy = false;
+    useSlot(state.kind === "ready" ? state.slots[0] : null);
+  };
+  async function loadSave(get: () => Promise<SaveState>) {
+    model.error = null;
+    model.busy = true;
+    renderPanel();
+    try {
+      setSave(await get());
+    } catch (e) {
+      model.busy = false;
+      // The user closing the folder picker is not an error.
+      if ((e as Error).name !== "AbortError") model.error = (e as Error).message;
+      renderPanel();
+    }
+  }
+  renderTravel();
+  renderPanel();
   menu.hidden = false;
-  if (import.meta.env.DEV) Object.assign(window, { __qd: { camera, controls, world, scene, renderer, compass } });
+  loadSave(restoreSave);
+  // Drop .sav files anywhere on the page.
+  window.addEventListener("dragover", (e) => e.preventDefault());
+  window.addEventListener("drop", (e) => {
+    e.preventDefault();
+    const files = [...(e.dataTransfer?.files ?? [])];
+    if (files.length) loadSave(() => savesFromFiles(files));
+  });
+  if (import.meta.env.DEV) {
+    Object.assign(window, { __qd: { camera, controls, world, scene, renderer, compass, collectibles, model } });
+  }
 
   landing.hidden = true;
   hud.hidden = false;
   const updateInfo = () => {
-    info.textContent = `Speed ${controls.speed.toFixed(1)} m/s · Tint ${world.tint ? "on" : "off"} (T)` +
+    info.textContent = `Speed ${controls.speed.toFixed(1)} m/s` +
       (world.errors ? ` · ${world.errors} meshes failed` : "");
   };
   controls.onSpeedChange = updateInfo;
   window.addEventListener("keydown", (e) => {
+    if ((e.target as HTMLElement).tagName === "INPUT") return;
     if (e.code === "KeyT") {
-      world.tint = !world.tint;
-      updateInfo();
+      settings.tint = !settings.tint;
+      model.onSettings();
     } else if (e.code === "KeyM") {
       menu.classList.toggle("collapsed");
     } else if (e.code === "KeyL") {
-      markers.visible = !markers.visible;
+      const on = !(settings.teleporters || settings.saves);
+      settings.teleporters = settings.saves = on;
+      model.onSettings();
     }
   });
   window.addEventListener("resize", () => {
@@ -147,19 +236,22 @@ async function start(sceneData: Awaited<ReturnType<typeof api.scene>>) {
     renderer.setSize(innerWidth, innerHeight);
   });
 
-  const progress = $("progress");
+  const progressEl = $("progress");
   const loading = world.load(sceneData, (p) => {
-    progress.textContent = p.done < p.total ? `Loading meshes ${p.done}/${p.total} ${p.label}` : "";
+    progressEl.textContent = p.done < p.total ? `Loading meshes ${p.done}/${p.total} ${p.label}` : "";
   });
   loading.then(() => {
-    progress.textContent = "";
+    world.assignShellFamilies().catch((e) => console.warn("shell families failed", e));
+    progressEl.textContent = "";
     updateInfo();
   });
   updateInfo();
 
+  const hover = $("hover");
+  // Zone label: the level of the surface below the camera (above it if nothing is below).
   const ray = new Raycaster();
   ray.far = 3000;
-  const center = new Vector2(0, 0);
+  const down = new Vector3(0, -1, 0), up = new Vector3(0, 1, 0);
   let lastRay = 0;
   const clock = new Clock();
   renderer.setAnimationLoop(() => {
@@ -168,13 +260,20 @@ async function start(sceneData: Awaited<ReturnType<typeof api.scene>>) {
     const now = performance.now();
     if (now - lastRay > 250) {
       lastRay = now;
-      ray.setFromCamera(center, camera);
-      const hit = ray.intersectObjects(world.root.children, false)[0];
+      ray.set(camera.position, down);
+      let hit = ray.intersectObjects(world.root.children, false)[0];
+      if (!hit) {
+        ray.set(camera.position, up);
+        hit = ray.intersectObjects(world.root.children, false)[0];
+      }
       const ud = (hit?.object as Mesh | undefined)?.userData;
       zoneLabel.textContent = ud ? `${areaLabel(ud.family)} · ${ud.level}` : "";
+      const picked = collectibles.pick(camera, innerWidth, innerHeight);
+      hover.textContent = picked ? describe(picked, !!progress) : "";
     }
     // Markers show through walls, so only show nearby ones.
-    if (markers.visible) for (const s of markers.children) s.visible = s.position.distanceTo(camera.position) < 250;
+    updateMarkers(markers, camera, settings, progress);
+    collectibles.update(camera, settings);
     renderer.render(scene, camera);
     compass.render(renderer, camera, dt);
   });
