@@ -79,7 +79,9 @@ export class World {
       const best = [...votes].sort((a, b) => b[1] - a[1])[0];
       if (!best) continue;
       s.userData.family = best[0];
-      s.material = await Promise.all((s.userData.matPaths as (string | null)[]).map((m) => this.material(m, best[0])));
+      s.material = await Promise.all(
+        (s.userData.matPaths as (string | null)[]).map((m) => this.material(m, best[0], !!s.userData.ghost)),
+      );
     }
   }
 
@@ -118,12 +120,12 @@ export class World {
     for (const a of actors) {
       const family = zoneFamily(a.level);
       const matPaths = geoData.materials.map((m, i) => a.overrides[i] ?? m);
-      const mats = await Promise.all(matPaths.map((m) => this.material(m, family)));
+      const mats = await Promise.all(matPaths.map((m) => this.material(m, family, !!a.ghost)));
       const mesh = new Mesh(geo, mats);
       mesh.matrixAutoUpdate = false;
       mesh.matrix.copy(new Matrix4().fromArray(a.matrix));
       mesh.matrixWorldNeedsUpdate = true;
-      mesh.userData = { level: a.level, family, mesh: path.split(".").pop(), matPaths };
+      mesh.userData = { level: a.level, family, mesh: path.split(".").pop(), matPaths, ghost: !!a.ghost };
       this.root.add(mesh);
     }
   }
@@ -153,8 +155,8 @@ export class World {
     return g;
   }
 
-  private material(path: string | null, family: string): Promise<MeshStandardMaterial> {
-    const key = `${path}|${family}`;
+  private material(path: string | null, family: string, ghost = false): Promise<MeshStandardMaterial> {
+    const key = `${path}|${family}|${ghost ? 1 : 0}`;
     let p = this.materials.get(key);
     if (!p) {
       p = (async () => {
@@ -181,6 +183,12 @@ export class World {
           mat.opacity = 0.55;
           mat.depthWrite = false;
           mat.roughness = 0.3;
+        }
+        if (ghost) {
+          // Secret walls and vault doors: see-through, so the passage behind shows.
+          mat.transparent = true;
+          mat.opacity = 0.75;
+          mat.depthWrite = false;
         }
         const base = mat.color.clone();
         this.tinted.push({ mat, tint: base.clone().lerp(base.clone().multiply(tint), TINT_AMOUNT) });

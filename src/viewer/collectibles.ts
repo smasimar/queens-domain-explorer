@@ -286,7 +286,8 @@ export function pickNearCentre(
 /** HUD text for a hovered collectible, one part per line. */
 export function describe(s: Sprite, hasSave: boolean): string {
   const p = s.userData.point as CollectiblePoint;
-  const opens = p.category === "chests" || p.category === "doors";
+  const opens = p.category === "chests" || p.category === "doors" || p.category === "vaults";
+  const vault = p.category === "vaults";
   const foe = p.category === "enemies";
   const parts = [p.count > 1 ? `${p.name} ×${p.count}` : p.name];
   // "Chest" and "Secret door" already name their category.
@@ -295,7 +296,7 @@ export function describe(s: Sprite, hasSave: boolean): string {
   if (p.hiddenBy) parts.push(p.hiddenBy);
   if (hasSave) {
     const c = s.userData.collected as boolean | null;
-    parts.push(c === null ? "save state unknown" : opens ? (c ? "opened" : "not opened") : foe ? (c ? "killed" : "not killed") : c ? "collected" : "not collected");
+    parts.push(c === null ? "save state unknown" : vault ? (c ? "explored" : "not explored") : opens ? (c ? "opened" : "not opened") : foe ? (c ? "killed" : "not killed") : c ? "collected" : "not collected");
   }
   return parts.join("\n");
 }

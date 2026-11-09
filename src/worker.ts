@@ -17,26 +17,35 @@ import {
   categorize,
   classResolver,
   LIBRARIAN_CLASS,
+  SHOPKEEPER_CLASS,
   type PlacedCollectible,
   parseLevelCollectibles,
   SHELF_CLASS,
 } from "./ue/collectibles.ts";
 import { decodeToRGBA } from "./ue/decode.ts";
 import { gamePathToPak, loadPackage } from "./ue/assets.ts";
-import { parseLevelAltars, parseLevelGeometry, parsePersistentLevel, type PlacedAltar } from "./ue/level.ts";
+import {
+  classesNeedingTemplates,
+  type ComponentTemplate,
+  loadComponentTemplates,
+  parseLevelAltars,
+  parseLevelGeometry,
+  parsePersistentLevel,
+  type PlacedAltar,
+} from "./ue/level.ts";
 import { type LocationAsset, parseLocationAsset } from "./ue/locations.ts";
 import { parseStringTable } from "./ue/stringtable.ts";
 import { resolveMaterial } from "./ue/material.ts";
 import type { Package } from "./ue/package.ts";
 import { PakFile } from "./ue/pak.ts";
 import { BlobSource, HttpRangeSource } from "./ue/source.ts";
-import { parseStaticMesh } from "./ue/staticmesh.ts";
+import { parseSkeletalMesh, parseStaticMesh } from "./ue/staticmesh.ts";
 import { parseTexture2D } from "./ue/texture.ts";
 import { readProps } from "./ue/properties.ts";
 import { IDENTITY, toThreeMatrix, ueToThreePoint, UNIT, type Xform } from "./ue/transform.ts";
 
 /** Bump when parser output changes, to invalidate caches. */
-const CACHE_VERSION = "v18";
+const CACHE_VERSION = "v23";
 const PERSISTENT = "/Game/RuinsLevel/Maps/Ruins_Level_00";
 const STRING_TABLE = "/Game/StringTables/ImportedStringTable";
 const ALTAR_MESH = {
@@ -150,6 +159,8 @@ async function buildCollectibles(placed: PlacedCollectible[], strings: Map<strin
     const data = c.item ? await itemData(c.item) : null;
     const name = foe
       ? foe.name
+      : c.kind === "vault"
+      ? "Treasure vault"
       : c.kind === "chest"
       ? "Chest"
       : c.kind === "door"
@@ -179,10 +190,34 @@ async function buildCollectibles(placed: PlacedCollectible[], strings: Map<strin
       item: c.kind === "pickup" || c.kind === "ghost" ? c.item : null,
       hiddenBy: c.kind === "ghost"
         ? (c.title ? strings.get(c.title) ?? c.title : null)
+        : c.kind === "vault"
+        ? `opens with the ${data?.name ?? "Key Stone"}`
         : c.hiddenBy,
       icon: data?.icon ?? null,
       ...(c.activators.length ? { activators: c.activators, required: c.required } : {}),
       ...(c.enemy ? { enemy: c.enemy } : {}),
+      ...(c.flag ? { flag: c.flag } : {}),
+    });
+  }
+  // The Blood Key Stone is only sold in the Shop (Shop asset, key_sz_door_red: 24 Coins,
+  // stock 1, after reading Treasure Hunter's Note III). Show it at the Shopkeeper.
+  const bloodKey = "/Game/Items/KeyItems/ShopPurchasedKey/SZDoorKey_Red.SZDoorKey_Red";
+  const shop = placed.find((c) => c.cls === SHOPKEEPER_CLASS);
+  if (shop && !out.some((p) => p.item === bloodKey)) {
+    const data = await itemData(bloodKey);
+    const [x, y, z] = ueToThreePoint(shop.xform.t);
+    out.push({
+      id: `${shop.level}/${shop.actor}/bloodkey`,
+      category: "keys",
+      name: data.name,
+      count: 1,
+      position: [x, y + 2, z],
+      level: shop.level,
+      guids: [],
+      noteKey: null,
+      item: bloodKey,
+      hiddenBy: "sold in the Shop for 24 Coins after reading Treasure Hunter's Note III",
+      icon: data.icon,
     });
   }
   // Two books are not placed in the world: show them where they come from.
@@ -335,13 +370,23 @@ const api: WorkerApi = {
       const altars: { level: string; altar: PlacedAltar }[] = [];
       const placed: PlacedCollectible[] = [];
       const classInfo = classResolver(loadPkg);
+      const templateCache = new Map<string, Promise<Map<string, ComponentTemplate>>>();
       for (const name of levels) {
         const sl = info.levels.find((l) => l.name === name);
         const pkg = await loadPkg(sl?.packagePath ?? `/Game/RuinsLevel/Maps/${name}`);
         if (!pkg) continue;
         loaded.push(name);
-        for (const p of parseLevelGeometry(pkg, sl?.xform)) {
-          actors.push({ level: name, mesh: p.mesh, matrix: toThreeMatrix(p.xform), overrides: p.overrides });
+        // Blueprint actors (e.g. vault door frames) keep their meshes in class templates.
+        const templates = new Map<string, Map<string, ComponentTemplate>>();
+        for (const cls of classesNeedingTemplates(pkg)) templates.set(cls, await loadComponentTemplates(cls, loadPkg, templateCache));
+        for (const p of parseLevelGeometry(pkg, sl?.xform, (c) => templates.get(c))) {
+          actors.push({
+            level: name,
+            mesh: p.mesh,
+            matrix: toThreeMatrix(p.xform),
+            overrides: p.overrides,
+            ...(p.ghost ? { ghost: true } : {}),
+          });
         }
         for (const altar of parseLevelAltars(pkg, sl?.xform)) {
           altars.push({ level: name, altar });
@@ -367,7 +412,7 @@ const api: WorkerApi = {
     return cached(`mesh:${path}`, async () => {
       const pkg = await loadPkg(path);
       if (!pkg) throw new Error(`Mesh not found: ${path}`);
-      const m = parseStaticMesh(pkg);
+      const m = pkg.exports.some((e) => pkg.exportClass(e) === "SkeletalMesh") ? parseSkeletalMesh(pkg) : parseStaticMesh(pkg);
       pkgCache.delete(gamePathToPak(path));
       const n = m.positions.length / 3;
       const positions = new Float32Array(n * 3);

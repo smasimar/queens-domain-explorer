@@ -97,7 +97,32 @@ function readBuffers(r: Reader): Omit<MeshData, "name" | "materials" | "sections
   const positions = new Float32Array(numVerts * 3);
   for (let i = 0; i < numVerts * 3; i++) positions[i] = r.f32();
 
-  // FStaticMeshVertexBuffer
+  const uvs = readUVs(r, numVerts);
+
+  // FColorVertexBuffer
+  strip(r);
+  r.i32(); // stride
+  const nColor = r.i32();
+  if (nColor > 0) {
+    const ce = r.i32();
+    const cc = r.i32();
+    r.skip(ce * cc);
+  }
+
+  // FRawStaticIndexBuffer
+  const is32 = r.bool32();
+  const ie = r.i32();
+  const ic = r.i32();
+  const raw = r.take(ie * ic);
+  const dv = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
+  const n = is32 ? raw.byteLength / 4 : raw.byteLength / 2;
+  const indices = new Uint32Array(n);
+  for (let i = 0; i < n; i++) indices[i] = is32 ? dv.getUint32(i * 4, true) : dv.getUint16(i * 2, true);
+  return { positions, uvs, indices };
+}
+
+/** FStaticMeshVertexBuffer: skip tangents, return the UV channels. */
+function readUVs(r: Reader, numVerts: number): Float32Array[] {
   strip(r);
   const numTex = r.i32();
   const nv = r.i32();
@@ -129,27 +154,56 @@ function readBuffers(r: Reader): Omit<MeshData, "name" | "materials" | "sections
     }
   }
   r.pos = uvStart + uvElem * uvCount;
+  return uvs;
+}
 
-  // FColorVertexBuffer
-  strip(r);
-  r.i32(); // stride
-  const nColor = r.i32();
-  if (nColor > 0) {
-    const ce = r.i32();
-    const cc = r.i32();
-    r.skip(ce * cc);
+/**
+ * LOD0 of a cooked SkeletalMesh, in its bind pose (enough for rigid props such as
+ * vault doors). Only inlined LOD data is read, and the native header before it is
+ * not parsed: the reader finds the vertex buffers by their layout. The LOD stores
+ * the index container (u8 type size, then element size, count, data) directly
+ * before the position buffer (stride 12, count, element size 12, count), followed
+ * by the same FStaticMeshVertexBuffer as static meshes. All triangles are put in
+ * one section with the first material.
+ */
+export function parseSkeletalMesh(pkg: Package): MeshData {
+  const exp = pkg.exports.find((e) => pkg.exportClass(e) === "SkeletalMesh");
+  if (!exp) throw new Error(`${pkg.path}: no SkeletalMesh export`);
+  const r = pkg.exportReader(exp);
+  const props: Props = readProps(r, pkg);
+  const start = r.pos;
+  const b = r.bytes;
+  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  for (let p = start; p + 16 <= b.length; p++) {
+    if (dv.getInt32(p, true) !== 12 || dv.getInt32(p + 8, true) !== 12) continue;
+    const numVerts = dv.getInt32(p + 4, true);
+    if (numVerts <= 0 || dv.getInt32(p + 12, true) !== numVerts) continue;
+    // The index buffer must end exactly where the position buffer starts.
+    let indices: Uint32Array | null = null;
+    for (const es of [2, 4]) {
+      for (let j = p - 8; j > start && !indices; j--) {
+        const count = dv.getInt32(j + 4, true);
+        if (dv.getInt32(j, true) !== es || count <= 0 || count % 3 || j + 8 + es * count !== p || b[j - 1] !== es) continue;
+        indices = new Uint32Array(count);
+        for (let i = 0; i < count; i++) indices[i] = es === 4 ? dv.getUint32(j + 8 + i * 4, true) : dv.getUint16(j + 8 + i * 2, true);
+        if (indices.some((v) => v >= numVerts)) indices = null;
+      }
+    }
+    if (!indices) continue;
+    const rr = new Reader(b, p + 16);
+    const positions = new Float32Array(numVerts * 3);
+    for (let i = 0; i < numVerts * 3; i++) positions[i] = rr.f32();
+    const uvs = readUVs(rr, numVerts);
+    return {
+      name: exp.objectName,
+      positions,
+      uvs,
+      indices,
+      sections: [{ materialIndex: 0, firstIndex: 0, numTriangles: indices.length / 3 }],
+      materials: readMaterialsFromProps(pkg, props),
+    };
   }
-
-  // FRawStaticIndexBuffer
-  const is32 = r.bool32();
-  const ie = r.i32();
-  const ic = r.i32();
-  const raw = r.take(ie * ic);
-  const dv = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
-  const n = is32 ? raw.byteLength / 4 : raw.byteLength / 2;
-  const indices = new Uint32Array(n);
-  for (let i = 0; i < n; i++) indices[i] = is32 ? dv.getUint32(i * 4, true) : dv.getUint16(i * 2, true);
-  return { positions, uvs, indices };
+  throw new Error(`${pkg.path}: skeletal mesh buffers not found (LOD data not inlined?)`);
 }
 
 /** StaticMaterials from tagged props; falls back to material imports in order. */

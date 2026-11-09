@@ -193,6 +193,7 @@ async function start(sceneData: Awaited<ReturnType<typeof api.scene>>) {
     const one = cat?.one ?? p.category;
     const fam = zoneFamily(p.level);
     const opens = p.category === "chests" || p.category === "doors";
+    const vault = p.category === "vaults";
     const foe = p.category === "enemies";
     entries.push({
       name: p.count > 1 ? `${p.name} ×${p.count}` : p.name,
@@ -204,7 +205,7 @@ async function start(sceneData: Awaited<ReturnType<typeof api.scene>>) {
         if (!progress) return null;
         const c = s.userData.collected as boolean | null;
         if (c === null) return null;
-        return { done: c, text: opens ? (c ? "opened" : "not opened") : foe ? (c ? "killed" : "not killed") : c ? "collected" : "not collected" };
+        return { done: c, text: vault ? (c ? "explored" : "not explored") : opens ? (c ? "opened" : "not opened") : foe ? (c ? "killed" : "not killed") : c ? "collected" : "not collected" };
       },
       go: () => {
         // Make sure the result is drawn: its category on, collected ones shown, in range.

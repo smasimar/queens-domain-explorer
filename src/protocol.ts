@@ -8,6 +8,8 @@ export interface SceneActor {
   /** Column-major 4x4. */
   matrix: number[];
   overrides: (string | null)[];
+  /** Draw see-through (secret walls, vault doors). */
+  ghost?: boolean;
 }
 
 export interface LocationPoint {

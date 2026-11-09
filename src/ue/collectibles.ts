@@ -11,6 +11,7 @@ export type CollectibleCategory =
   | "skulls"
   | "keys"
   | "books"
+  | "vaults"
   | "health"
   | "upgrades"
   | "treasure"
@@ -36,7 +37,9 @@ export interface PlacedCollectible {
   /** Notes: the display title. */
   title: string | null;
   /** "anchor": a book shelf slot or an NPC that gives a book (not shown, used by the worker). */
-  kind: "pickup" | "note" | "chest" | "door" | "enemy" | "ghost" | "anchor";
+  kind: "pickup" | "note" | "chest" | "door" | "enemy" | "ghost" | "anchor" | "vault";
+  /** Vaults: the NamedSaveData key set when the vault's reward is taken. */
+  flag: string | null;
   /** Enemy spawners: the EnemyData asset path. */
   enemy: string | null;
   /**
@@ -76,6 +79,15 @@ const DOOR_CLASS = "/Game/Blueprints/SecretWall.SecretWall_C";
  */
 export const SHELF_CLASS = "/Game/Items/KeyItems/BookKeys/LIB_BookRecepticle_BP.LIB_BookRecepticle_BP_C";
 export const LIBRARIAN_CLASS = "/Game/NPCs/Librarian/Librarian_NPC_BP.Librarian_NPC_BP_C";
+/** The shop; the Blood Key Stone is sold here. */
+export const SHOPKEEPER_CLASS = "/Game/Blueprints/Shop/Shopkeeper.Shopkeeper_C";
+/**
+ * Treasure vault doors, locked with a Key Stone of their colour. The "Forgotten Rooms"
+ * challenge counts one SR_<reward>_Acquired NamedSaveData per vault, set (by an
+ * ActivatableNamedSaveDataSetter in the same sublevel) when its reward is taken.
+ */
+const VAULT_CLASS = /\/SecretZoneDoor_(Red|Green|Blue)_BP\./;
+const VAULT_FLAG = /^SR_\w+_Acquired$/;
 /** Properties that list the actors an activator reveals. */
 const ACTIVATOR_PROPS = ["ActorsToActivateOnOpen", "ActorsToActivateOnBreak", "ActivatableTargets"];
 
@@ -205,12 +217,13 @@ export async function parseLevelCollectibles(
     const isChest = CHEST_CLASS.test(cls);
     const isDoor = cls === DOOR_CLASS;
     const isActivator = /Chest|Crate|Barrel|pot|SecretWall/i.test(cls);
-    const isAnchor = cls === SHELF_CLASS || cls === LIBRARIAN_CLASS;
+    const isAnchor = cls === SHELF_CLASS || cls === LIBRARIAN_CLASS || cls === SHOPKEEPER_CLASS;
+    const vault = VAULT_CLASS.exec(cls)?.[1] ?? null;
     const info = isNote ? null : await classInfo(cls);
     const isPickup = !!info?.chain.includes(PICKUP_BASE);
     const isSpawner = !!info?.chain.includes(SPAWNER_BASE);
     const isGhost = !!info?.memento && info.chain.includes(GHOST_BASE);
-    if (!isNote && !isPickup && !isActivator && !isSpawner && !isGhost && !isAnchor) continue;
+    if (!isNote && !isPickup && !isActivator && !isSpawner && !isGhost && !isAnchor && !vault) continue;
     const p = propsOf(i + 1);
     if (isActivator) {
       for (const name of ACTIVATOR_PROPS) {
@@ -226,7 +239,7 @@ export async function parseLevelCollectibles(
       enemy = ed < 0 ? pkg.importPath(ed) : info?.enemyData ?? null;
       if (!enemy) continue;
     }
-    if (!isNote && !isPickup && !isChest && !isDoor && !isSpawner && !isGhost && !isAnchor) continue;
+    if (!isNote && !isPickup && !isChest && !isDoor && !isSpawner && !isGhost && !isAnchor && !vault) continue;
     const root = ref(p.RootComponent);
     if (root <= 0) continue;
     const guids = guidsOf(p);
@@ -242,6 +255,8 @@ export async function parseLevelCollectibles(
       const k = ref(p.SpecifiedKeys[0]);
       if (k < 0) item = pkg.importPath(k);
     }
+    // Vaults: the Key Stone that opens it.
+    if (vault) item = `/Game/Items/KeyItems/ShopPurchasedKey/SZDoorKey_${vault}.SZDoorKey_${vault}`;
     if (isGhost && info?.memento) {
       // The memento is the first item its pickup class grants.
       const first = [...(await classInfo(info.memento)).grants][0];
@@ -260,7 +275,22 @@ export async function parseLevelCollectibles(
       guids,
       noteKey: typeof p.ImportKey === "string" && p.ImportKey ? p.ImportKey : null,
       title: title ? title.key ?? title.text ?? null : null,
-      kind: isNote ? "note" : isPickup ? "pickup" : isDoor ? "door" : isSpawner ? "enemy" : isGhost ? "ghost" : isAnchor ? "anchor" : "chest",
+      kind: vault
+        ? "vault"
+        : isNote
+        ? "note"
+        : isPickup
+        ? "pickup"
+        : isDoor
+        ? "door"
+        : isSpawner
+        ? "enemy"
+        : isGhost
+        ? "ghost"
+        : isAnchor
+        ? "anchor"
+        : "chest",
+      flag: vault ? pkg.names.find((n) => VAULT_FLAG.test(n)) ?? null : null,
       enemy,
       hiddenBy: null,
       activators: [],
@@ -284,7 +314,7 @@ export async function parseLevelCollectibles(
     }
   }
   for (const c of out) {
-    if (c.kind === "enemy" || c.kind === "anchor") continue;
+    if (c.kind === "enemy" || c.kind === "anchor" || c.kind === "vault") continue;
     if (c.kind === "door") {
       c.hiddenBy = c.activators.length ? (c.required > 1 ? `opens with ${c.required} switches` : "opens with a switch") : null;
       continue;
@@ -309,6 +339,7 @@ export function categorize(
   if (kind === "enemy") return "enemies";
   if (kind === "ghost") return "mementos";
   if (kind === "anchor") return null;
+  if (kind === "vault") return "vaults";
   if (/\/RaiderNecklaceKey\//.test(cls)) return "necklaces";
   if (/\/ScientistUpgrades\/WeaponUpgradeUnlock/.test(cls)) return "modules";
   const n = Number(/NewEnumerator(\d+)/.exec(itemCategory ?? "")?.[1] ?? -1);

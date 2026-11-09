@@ -23,6 +23,8 @@ export class Progress {
   collected(p: CollectiblePoint): boolean | null {
     if (p.enemy) return this.kills.has(p.enemy);
     if (p.category === "notes") return p.noteKey ? this.flags.has(`ReadNote_${p.noteKey}`) : null;
+    // Treasure vaults: explored once the reward inside is taken (what "Forgotten Rooms" counts).
+    if (p.category === "vaults") return p.flag ? this.flags.has(p.flag) : null;
     // A few unique pickups have no save GUID: the save only records the item
     // (owned, used up or sold). Each is the only placement of its item.
     if (!p.guids.length) return p.item ? this.items.has(p.item) : null;

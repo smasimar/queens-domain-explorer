@@ -56,7 +56,8 @@ one) to fly to it. With a save, each result shows whether you have it.
     - Accessories
     - Orbewa Eggs
     - Strange Skulls
-    - Keys
+    - Keys, including the 3 Key Stones. The Blood Key Stone is sold in the Shop,
+      so it shows at the Shopkeeper.
     - Books: all 14. Two are not placed in the world, so they show where you get
       them: The Old Ones Beyond at Bones of Archivist Inha, and The History of
       Dragons at Wourha (the bestiary reward for 25%).
@@ -64,7 +65,11 @@ one) to fly to it. With a save, each result shows whether you have it.
     - Other upgrades
     - Treasure
     - Chests
-    - Secret doors: the 89 that the "Concealed Passages" challenge counts.
+    - Secret doors: the 89 that the "Concealed Passages" challenge counts. Secret
+      walls are drawn see-through, so you can see the passage behind them.
+    - Treasure vaults: the 5 vaults the "Forgotten Rooms" challenge counts. Each
+      opens with a Key Stone; a vault counts as explored once you take its reward.
+      Vault doors are drawn see-through too.
     - Unique enemies: the 46 enemy types that have one spawn point in the world,
       no boss health bar, and count for Wourha's bestiary ("A Lifetime's Work").
       With a save, a type you have killed once is greyed out.
