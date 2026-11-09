@@ -10,6 +10,7 @@ export type CollectibleCategory =
   | "eggs"
   | "skulls"
   | "keys"
+  | "books"
   | "health"
   | "upgrades"
   | "treasure"
@@ -34,7 +35,8 @@ export interface PlacedCollectible {
   noteKey: string | null;
   /** Notes: the display title. */
   title: string | null;
-  kind: "pickup" | "note" | "chest" | "door" | "enemy" | "ghost";
+  /** "anchor": a book shelf slot or an NPC that gives a book (not shown, used by the worker). */
+  kind: "pickup" | "note" | "chest" | "door" | "enemy" | "ghost" | "anchor";
   /** Enemy spawners: the EnemyData asset path. */
   enemy: string | null;
   /**
@@ -68,6 +70,12 @@ const GHOST_BASE = "/Game/NPCs/NPC_Ghost_Base.NPC_Ghost_Base_C";
 const SPAWNER_BASE = "/Game/Enemies/EnemySpawner.EnemySpawner_C";
 /** Secret walls; the "Concealed Passages" challenge counts the ones without Don'tCountForAchievement. */
 const DOOR_CLASS = "/Game/Blueprints/SecretWall.SecretWall_C";
+/**
+ * Tower of Knowledge book shelf slots (each takes one book, SpecifiedKeys) and the
+ * Librarian, who gives a book as a bestiary reward.
+ */
+export const SHELF_CLASS = "/Game/Items/KeyItems/BookKeys/LIB_BookRecepticle_BP.LIB_BookRecepticle_BP_C";
+export const LIBRARIAN_CLASS = "/Game/NPCs/Librarian/Librarian_NPC_BP.Librarian_NPC_BP_C";
 /** Properties that list the actors an activator reveals. */
 const ACTIVATOR_PROPS = ["ActorsToActivateOnOpen", "ActorsToActivateOnBreak", "ActivatableTargets"];
 
@@ -197,11 +205,12 @@ export async function parseLevelCollectibles(
     const isChest = CHEST_CLASS.test(cls);
     const isDoor = cls === DOOR_CLASS;
     const isActivator = /Chest|Crate|Barrel|pot|SecretWall/i.test(cls);
+    const isAnchor = cls === SHELF_CLASS || cls === LIBRARIAN_CLASS;
     const info = isNote ? null : await classInfo(cls);
     const isPickup = !!info?.chain.includes(PICKUP_BASE);
     const isSpawner = !!info?.chain.includes(SPAWNER_BASE);
     const isGhost = !!info?.memento && info.chain.includes(GHOST_BASE);
-    if (!isNote && !isPickup && !isActivator && !isSpawner && !isGhost) continue;
+    if (!isNote && !isPickup && !isActivator && !isSpawner && !isGhost && !isAnchor) continue;
     const p = propsOf(i + 1);
     if (isActivator) {
       for (const name of ACTIVATOR_PROPS) {
@@ -217,7 +226,7 @@ export async function parseLevelCollectibles(
       enemy = ed < 0 ? pkg.importPath(ed) : info?.enemyData ?? null;
       if (!enemy) continue;
     }
-    if (!isNote && !isPickup && !isChest && !isDoor && !isSpawner && !isGhost) continue;
+    if (!isNote && !isPickup && !isChest && !isDoor && !isSpawner && !isGhost && !isAnchor) continue;
     const root = ref(p.RootComponent);
     if (root <= 0) continue;
     const guids = guidsOf(p);
@@ -228,6 +237,10 @@ export async function parseLevelCollectibles(
       const first = [...grants][0];
       if (first) [item, count] = first;
       else item = info.configOverride;
+    }
+    if (isAnchor && Array.isArray(p.SpecifiedKeys)) {
+      const k = ref(p.SpecifiedKeys[0]);
+      if (k < 0) item = pkg.importPath(k);
     }
     if (isGhost && info?.memento) {
       // The memento is the first item its pickup class grants.
@@ -247,7 +260,7 @@ export async function parseLevelCollectibles(
       guids,
       noteKey: typeof p.ImportKey === "string" && p.ImportKey ? p.ImportKey : null,
       title: title ? title.key ?? title.text ?? null : null,
-      kind: isNote ? "note" : isPickup ? "pickup" : isDoor ? "door" : isSpawner ? "enemy" : isGhost ? "ghost" : "chest",
+      kind: isNote ? "note" : isPickup ? "pickup" : isDoor ? "door" : isSpawner ? "enemy" : isGhost ? "ghost" : isAnchor ? "anchor" : "chest",
       enemy,
       hiddenBy: null,
       activators: [],
@@ -271,7 +284,7 @@ export async function parseLevelCollectibles(
     }
   }
   for (const c of out) {
-    if (c.kind === "enemy") continue;
+    if (c.kind === "enemy" || c.kind === "anchor") continue;
     if (c.kind === "door") {
       c.hiddenBy = c.activators.length ? (c.required > 1 ? `opens with ${c.required} switches` : "opens with a switch") : null;
       continue;
@@ -295,10 +308,12 @@ export function categorize(
   if (kind === "door") return "doors";
   if (kind === "enemy") return "enemies";
   if (kind === "ghost") return "mementos";
+  if (kind === "anchor") return null;
   if (/\/RaiderNecklaceKey\//.test(cls)) return "necklaces";
   if (/\/ScientistUpgrades\/WeaponUpgradeUnlock/.test(cls)) return "modules";
   const n = Number(/NewEnumerator(\d+)/.exec(itemCategory ?? "")?.[1] ?? -1);
   if (/\/KeyItems\/Egg\//.test(cls)) return "eggs";
+  if (/\/KeyItems\/BookKeys\//.test(cls)) return "books";
   if (/\/SecretRelicKey\//.test(cls)) return "skulls";
   if (/\/Upgrades\/\w+_Upgrade\//.test(cls)) return "health";
   if (/\/(Upgrades|ScientistUpgrades)\/|RuneVisionUnlock|GrimoireInk/.test(cls)) return "upgrades";

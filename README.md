@@ -45,7 +45,7 @@ one) to fly to it. With a save, each result shows whether you have it.
   Click an entry to fly there.
 - **Markers** has display toggles (zone tint, draw range), landmarks (Wing Altars,
   Crystal Monuments) and a toggle for each collectible category (Main Weapons, Throwing
-  Weapons, accessories, Orbewa Eggs, Strange Skulls, keys, Meals and other upgrades, treasure,
+  Weapons, accessories, Orbewa Eggs, Strange Skulls, keys, books, Meals and other upgrades, treasure,
   chests, secret doors, unique enemies, Mementos, Fallen Raider's Necklaces, Data
   Modules, notes). Point the crosshair at a marker to
   see its name and where it hides (in chest, in crate, behind secret wall). Crystal

@@ -17,6 +17,7 @@ export const CATEGORIES: CategoryInfo[] = [
   { id: "eggs", label: "Orbewa Eggs", one: "Orbewa Egg", color: "#f4f1de", on: true },
   { id: "skulls", label: "Strange Skulls", one: "Strange Skull", color: "#9fb4bd", on: true },
   { id: "keys", label: "Keys", one: "Key", color: "#ffe066", on: true },
+  { id: "books", label: "Books", one: "Book", color: "#a0785a", on: true },
   { id: "health", label: "Meals", one: "Meal", color: "#ff6b6b", on: true },
   { id: "upgrades", label: "Other upgrades", one: "Upgrade", color: "#4fd8e8", on: true },
   { id: "treasure", label: "Treasure", one: "Treasure", color: "#f0a020", on: true },

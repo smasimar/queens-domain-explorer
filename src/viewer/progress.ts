@@ -27,6 +27,10 @@ export class Progress {
     // (owned, used up or sold). Each is the only placement of its item.
     if (!p.guids.length) return p.item ? this.items.has(p.item) : null;
     if (p.guids.some((g) => this.states.has(g))) return true;
+    if (p.flag && this.flags.has(p.flag)) return true;
+    // Books: placing one on its Tower of Knowledge shelf takes it out of the inventory,
+    // but the shelf slot saves its state (one of the GUIDs); holding it counts too.
+    if (p.category === "books" && p.item && this.items.has(p.item)) return true;
     // Mementos: the ghost's state is not always saved; holding (or having offered) the memento counts.
     if (p.category === "mementos" && p.item && this.items.has(p.item)) return true;
     // Switch-opened secret doors: the switches save their state, the door does not.

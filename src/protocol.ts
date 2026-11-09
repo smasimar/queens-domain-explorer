@@ -45,6 +45,8 @@ export interface CollectiblePoint {
   /** Secret doors opened by switches: save GUIDs per switch, and how many must be set. */
   activators?: string[][];
   required?: number;
+  /** Collected when the save's NamedSaveData has this key (e.g. a reward was given). */
+  flag?: string;
   /** Unique enemies: the EnemyData path; killed when the save's KilledEnemyCounts has it. */
   enemy?: string;
 }

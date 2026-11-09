@@ -13,7 +13,14 @@ import type {
   UiImage,
   WorkerApi,
 } from "./protocol.ts";
-import { categorize, classResolver, type PlacedCollectible, parseLevelCollectibles } from "./ue/collectibles.ts";
+import {
+  categorize,
+  classResolver,
+  LIBRARIAN_CLASS,
+  type PlacedCollectible,
+  parseLevelCollectibles,
+  SHELF_CLASS,
+} from "./ue/collectibles.ts";
 import { decodeToRGBA } from "./ue/decode.ts";
 import { gamePathToPak, loadPackage } from "./ue/assets.ts";
 import { parseLevelAltars, parseLevelGeometry, parsePersistentLevel, type PlacedAltar } from "./ue/level.ts";
@@ -29,7 +36,7 @@ import { readProps } from "./ue/properties.ts";
 import { IDENTITY, toThreeMatrix, ueToThreePoint, UNIT, type Xform } from "./ue/transform.ts";
 
 /** Bump when parser output changes, to invalidate caches. */
-const CACHE_VERSION = "v15";
+const CACHE_VERSION = "v18";
 const PERSISTENT = "/Game/RuinsLevel/Maps/Ruins_Level_00";
 const STRING_TABLE = "/Game/StringTables/ImportedStringTable";
 const ALTAR_MESH = {
@@ -133,6 +140,9 @@ async function buildCollectibles(placed: PlacedCollectible[], strings: Map<strin
     }
     return p;
   };
+  // Book shelf slots in the Tower of Knowledge: book item -> the slot's save GUIDs.
+  const shelf = new Map<string, string[]>();
+  for (const c of placed) if (c.cls === SHELF_CLASS && c.item) shelf.set(c.item, c.guids);
   const out: CollectiblePoint[] = [];
   for (const c of placed) {
     const foe = c.enemy ? await enemyData(c.enemy) : null;
@@ -164,7 +174,7 @@ async function buildCollectibles(placed: PlacedCollectible[], strings: Map<strin
       position: ueToThreePoint(c.xform.t),
       level: c.level,
       // Spawner GUIDs are in EnemySaveStates, not SavableActorStates; kills are tracked per type.
-      guids: foe ? [] : c.guids,
+      guids: foe ? [] : category === "books" && c.item ? [...c.guids, ...(shelf.get(c.item) ?? [])] : c.guids,
       noteKey: c.noteKey,
       item: c.kind === "pickup" || c.kind === "ghost" ? c.item : null,
       hiddenBy: c.kind === "ghost"
@@ -173,6 +183,42 @@ async function buildCollectibles(placed: PlacedCollectible[], strings: Map<strin
       icon: data?.icon ?? null,
       ...(c.activators.length ? { activators: c.activators, required: c.required } : {}),
       ...(c.enemy ? { enemy: c.enemy } : {}),
+    });
+  }
+  // Two books are not placed in the world: show them where they come from.
+  const BOOKS = "/Game/Items/KeyItems/BookKeys/";
+  const sources: { item: string; at: PlacedCollectible | undefined; hiddenBy: string; flag?: string }[] = [
+    {
+      item: `${BOOKS}Eldritch/BookKey_00_Eldritch_Item.BookKey_00_Eldritch_Item`,
+      at: placed.find((c) => c.enemy?.includes("/LostLibrarian_Data.")),
+      hiddenBy: `dropped by ${strings.get("lost_librarian_name") ?? "Bones of Archivist Inha"}`,
+    },
+    {
+      item: `${BOOKS}Dragons/BookKey_00_Dragons_Item.BookKey_00_Dragons_Item`,
+      at: placed.find((c) => c.cls === LIBRARIAN_CLASS),
+      // Librarian_NPC_BP RewardList: the first reward, at 25% bestiary completion.
+      hiddenBy: "Wourha's reward for 25% of the bestiary",
+      flag: "LibrarianQuestRewardCount",
+    },
+  ];
+  for (const s of sources) {
+    if (!s.at || out.some((p) => p.item === s.item)) continue;
+    const data = await itemData(s.item);
+    // Lift it above the enemy / NPC marker at the same spot.
+    const [x, y, z] = ueToThreePoint(s.at.xform.t);
+    out.push({
+      id: `${s.at.level}/${s.at.actor}/book`,
+      category: "books",
+      name: data.name,
+      count: 1,
+      position: [x, y + 1.5, z],
+      level: s.at.level,
+      guids: shelf.get(s.item) ?? [],
+      noteKey: null,
+      item: s.item,
+      hiddenBy: s.hiddenBy,
+      icon: data.icon,
+      ...(s.flag ? { flag: s.flag } : {}),
     });
   }
   return out;
