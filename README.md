@@ -20,6 +20,10 @@ stagger, weapon XP and special charges work.
    `…\steamapps\common\QueensDomain\QueensDomain\Content\Paks\`.
 3. Wait for the world to load. Converted data is cached in your browser's private
    storage (OPFS), so next time you can use **Open from local cache**.
+4. Optional: load your save to grey out what you already collected. Open the menu
+   (**M**), go to **Markers → Save**, click **Select save files** and select
+   `World0.sav` in `%LOCALAPPDATA%\QueensDomain\Saved\SaveGames\<SteamID>\`.
+   You can also drop the `.sav` files on the page. See [Your save file](#your-save-file).
 
 ### Controls
 
@@ -43,17 +47,35 @@ one) to fly to it. With a save, each result shows whether you have it.
 
 - **Wing Altars** lists every Wing Altar and Crystal Monument, grouped by area.
   Click an entry to fly there.
-- **Markers** has display toggles (zone tint, draw range), landmarks (Wing Altars,
-  Crystal Monuments) and a toggle for each collectible category (Main Weapons, Throwing
-  Weapons, accessories, Orbewa Eggs, Strange Skulls, keys, books, Meals and other upgrades, treasure,
-  chests, secret doors, unique enemies, Mementos, Fallen Raider's Necklaces, Data
-  Modules, notes). Point the crosshair at a marker to
-  see its name and where it hides (in chest, in crate, behind secret wall). Crystal
-  Monuments show their area and name. Secret doors are the 89 that the
-  "Concealed Passages" challenge counts. Unique enemies are the 46 enemy types that
-  have one spawn point in the world, no boss health bar, and count for Wourha's
-  bestiary ("A Lifetime's Work"). With a save, a type you have killed once is greyed out. Mementos mark the 8 spirits that give
-  a memento for the Okbujo shrine.
+- **Markers** has:
+  - **Display**: zone tint and marker draw range.
+  - **Landmarks**: Wing Altars and Crystal Monuments.
+  - **Collectibles**: a toggle for each category:
+    - Main Weapons
+    - Throwing Weapons
+    - Accessories
+    - Orbewa Eggs
+    - Strange Skulls
+    - Keys
+    - Books: all 14. Two are not placed in the world, so they show where you get
+      them: The Old Ones Beyond at Bones of Archivist Inha, and The History of
+      Dragons at Wourha (the bestiary reward for 25%).
+    - Meals
+    - Other upgrades
+    - Treasure
+    - Chests
+    - Secret doors: the 89 that the "Concealed Passages" challenge counts.
+    - Unique enemies: the 46 enemy types that have one spawn point in the world,
+      no boss health bar, and count for Wourha's bestiary ("A Lifetime's Work").
+      With a save, a type you have killed once is greyed out.
+    - Mementos: the 8 spirits that give a memento for the Okbujo shrine.
+    - Fallen Raider's Necklaces
+    - Data Modules
+    - Notes (off by default)
+  - **Save**: your save files (see [Your save file](#your-save-file)).
+
+Point the crosshair at a marker to see its name and where it hides (in chest, in
+crate, behind secret wall). Crystal Monuments show their area and name.
 
 The compass (top right) is the game's own compass sphere.
 
